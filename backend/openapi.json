@@ -1,0 +1,1552 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ARGUS Backend API",
+    "description": "Day-1 P4 API contract scaffold for ARGUS MVP. Endpoints are stubs and return placeholder payloads.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search/entities": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search Entities",
+        "operationId": "search_entities_search_entities_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EntityType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchEntityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entities/{entity_id}": {
+      "get": {
+        "tags": [
+          "entities"
+        ],
+        "summary": "Get Entity Detail",
+        "operationId": "get_entity_detail_entities__entity_id__get",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/graph/expand": {
+      "post": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Expand Graph",
+        "operationId": "expand_graph_graph_expand_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphExpandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphExpandResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "List Cases",
+        "operationId": "list_cases_cases_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "jurisdiction_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Jurisdiction Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Create Case",
+        "operationId": "create_case_cases_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{case_id}": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Get Case",
+        "operationId": "get_case_cases__case_id__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Update Case",
+        "operationId": "update_case_cases__case_id__patch",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{case_id}/entities": {
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Pin Entity To Case",
+        "operationId": "pin_entity_to_case_cases__case_id__entities_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinCaseEntityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Pin Entity To Case Cases  Case Id  Entities Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{case_id}/notes": {
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Add Case Note",
+        "operationId": "add_case_note_cases__case_id__notes_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCaseNoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Add Case Note Cases  Case Id  Notes Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patterns": {
+      "get": {
+        "tags": [
+          "patterns"
+        ],
+        "summary": "List Patterns",
+        "operationId": "list_patterns_patterns_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PatternStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatternListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patterns/{pattern_id}": {
+      "get": {
+        "tags": [
+          "patterns"
+        ],
+        "summary": "Get Pattern",
+        "operationId": "get_pattern_patterns__pattern_id__get",
+        "parameters": [
+          {
+            "name": "pattern_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pattern Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatternSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patterns/{pattern_id}/feedback": {
+      "post": {
+        "tags": [
+          "patterns"
+        ],
+        "summary": "Feedback Pattern",
+        "operationId": "feedback_pattern_patterns__pattern_id__feedback_post",
+        "parameters": [
+          {
+            "name": "pattern_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pattern Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatternFeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Feedback Pattern Patterns  Pattern Id  Feedback Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/export": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Export Report",
+        "operationId": "export_report_reports_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportExportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddCaseNoteRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "AddCaseNoteRequest"
+      },
+      "CaseCreateRequest": {
+        "properties": {
+          "fir_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fir Number"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "title": "Title"
+          },
+          "jurisdiction_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Jurisdiction Id"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "is_sensitive": {
+            "type": "boolean",
+            "title": "Is Sensitive",
+            "default": false
+          },
+          "sensitivity_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sensitivity Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "jurisdiction_id"
+        ],
+        "title": "CaseCreateRequest"
+      },
+      "CaseListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CaseSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "items"
+        ],
+        "title": "CaseListResponse"
+      },
+      "CaseSummary": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "fir_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fir Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "jurisdiction_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Jurisdiction Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "is_sensitive": {
+            "type": "boolean",
+            "title": "Is Sensitive"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "fir_number",
+          "title",
+          "jurisdiction_id",
+          "status",
+          "is_sensitive",
+          "category",
+          "opened_at"
+        ],
+        "title": "CaseSummary"
+      },
+      "CaseUpdateRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "open|under_review|closed"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "type": "object",
+        "title": "CaseUpdateRequest"
+      },
+      "EntityDetailResponse": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "canonical_name": {
+            "type": "string",
+            "title": "Canonical Name"
+          },
+          "confidence_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Score"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "relationships": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipSummary"
+            },
+            "type": "array",
+            "title": "Relationships"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "entity_type",
+          "canonical_name",
+          "confidence_score"
+        ],
+        "title": "EntityDetailResponse"
+      },
+      "EntityType": {
+        "type": "string",
+        "enum": [
+          "person",
+          "organization",
+          "location",
+          "vehicle",
+          "phone",
+          "financial_account",
+          "event"
+        ],
+        "title": "EntityType"
+      },
+      "GraphEdge": {
+        "properties": {
+          "relationship_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Relationship Id"
+          },
+          "source_entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Entity Id"
+          },
+          "target_entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Entity Id"
+          },
+          "relationship_type": {
+            "type": "string",
+            "title": "Relationship Type"
+          },
+          "confidence_score": {
+            "type": "number",
+            "title": "Confidence Score"
+          },
+          "is_direct": {
+            "type": "boolean",
+            "title": "Is Direct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relationship_id",
+          "source_entity_id",
+          "target_entity_id",
+          "relationship_type",
+          "confidence_score",
+          "is_direct"
+        ],
+        "title": "GraphEdge"
+      },
+      "GraphExpandRequest": {
+        "properties": {
+          "root_entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Root Entity Id"
+          },
+          "max_hops": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Max Hops",
+            "default": 2
+          },
+          "confidence_threshold": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence Threshold",
+            "default": 0.5
+          },
+          "include_indirect": {
+            "type": "boolean",
+            "title": "Include Indirect",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "root_entity_id"
+        ],
+        "title": "GraphExpandRequest"
+      },
+      "GraphExpandResponse": {
+        "properties": {
+          "root_entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Root Entity Id"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root_entity_id",
+          "nodes",
+          "edges"
+        ],
+        "title": "GraphExpandResponse"
+      },
+      "GraphNode": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "influence_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Influence Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "entity_type",
+          "label"
+        ],
+        "title": "GraphNode"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LoginRequest": {
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Employee Id"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Password"
+          },
+          "otp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Otp",
+            "description": "MFA OTP for demo flow"
+          }
+        },
+        "type": "object",
+        "required": [
+          "employee_id",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "LoginResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "jurisdiction_id": {
+            "type": "string",
+            "title": "Jurisdiction Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_in_seconds",
+          "role",
+          "jurisdiction_id"
+        ],
+        "title": "LoginResponse"
+      },
+      "PatternFeedbackRequest": {
+        "properties": {
+          "verdict": {
+            "$ref": "#/components/schemas/PatternStatus",
+            "description": "confirmed or dismissed"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict"
+        ],
+        "title": "PatternFeedbackRequest"
+      },
+      "PatternListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PatternSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "items"
+        ],
+        "title": "PatternListResponse"
+      },
+      "PatternStatus": {
+        "type": "string",
+        "enum": [
+          "new",
+          "confirmed",
+          "dismissed",
+          "escalated"
+        ],
+        "title": "PatternStatus"
+      },
+      "PatternSummary": {
+        "properties": {
+          "pattern_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pattern Id"
+          },
+          "pattern_type": {
+            "type": "string",
+            "title": "Pattern Type"
+          },
+          "confidence_score": {
+            "type": "number",
+            "title": "Confidence Score"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PatternStatus"
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Detected At"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pattern_id",
+          "pattern_type",
+          "confidence_score",
+          "status",
+          "detected_at"
+        ],
+        "title": "PatternSummary"
+      },
+      "PinCaseEntityRequest": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id"
+        ],
+        "title": "PinCaseEntityRequest"
+      },
+      "RelationshipSummary": {
+        "properties": {
+          "relationship_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Relationship Id"
+          },
+          "source_entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Entity Id"
+          },
+          "target_entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Entity Id"
+          },
+          "relationship_type": {
+            "type": "string",
+            "title": "Relationship Type"
+          },
+          "is_direct": {
+            "type": "boolean",
+            "title": "Is Direct"
+          },
+          "confidence_score": {
+            "type": "number",
+            "title": "Confidence Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relationship_id",
+          "source_entity_id",
+          "target_entity_id",
+          "relationship_type",
+          "is_direct",
+          "confidence_score"
+        ],
+        "title": "RelationshipSummary"
+      },
+      "ReportExportRequest": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "description": "whole_case|selected_entities|selected_subgraph"
+          },
+          "include_sections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Include Sections"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "description": "pdf|docx"
+          },
+          "justification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Justification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "scope",
+          "format"
+        ],
+        "title": "ReportExportRequest"
+      },
+      "ReportExportResponse": {
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Report Id"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "download_url": {
+            "type": "string",
+            "title": "Download Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "case_id",
+          "format",
+          "status",
+          "download_url"
+        ],
+        "title": "ReportExportResponse"
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "investigator",
+          "analyst",
+          "supervisor",
+          "admin",
+          "compliance"
+        ],
+        "title": "Role"
+      },
+      "SearchEntityItem": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "canonical_name": {
+            "type": "string",
+            "title": "Canonical Name"
+          },
+          "confidence_score": {
+            "type": "number",
+            "title": "Confidence Score"
+          },
+          "source_record_count": {
+            "type": "integer",
+            "title": "Source Record Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "entity_type",
+          "canonical_name",
+          "confidence_score",
+          "source_record_count"
+        ],
+        "title": "SearchEntityItem"
+      },
+      "SearchEntityResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SearchEntityItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "total",
+          "items"
+        ],
+        "title": "SearchEntityResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
