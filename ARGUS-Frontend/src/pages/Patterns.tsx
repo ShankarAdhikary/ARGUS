@@ -4,7 +4,8 @@ import PageHeader from "../components/PageHeader";
 import LeadNotice from "../components/LeadNotice";
 import ConfidencePill from "../components/ConfidencePill";
 import SourceChip from "../components/SourceChip";
-import { API_BASE_URL, burners, getToken, listPatterns, patternFeedback } from "../lib/api";
+import WomenSafetyBadge from "../components/WomenSafetyBadge";
+import { API_BASE_URL, getToken, listPatterns, patternFeedback } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { PatternRecord } from "../types";
 
@@ -22,27 +23,14 @@ export default function Patterns() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "new" | "confirmed" | "dismissed" | "escalated">("all");
+  const [womenSafetyOnly, setWomenSafetyOnly] = useState(false);
 
   async function refresh() {
     setLoading(true);
     setError("");
     try {
-      const [base, burnerData] = await Promise.all([listPatterns(), burners(2)]);
-      let combined = base;
-      if (burnerData?.burners?.length) {
-        const burnerPatterns: PatternRecord[] = burnerData.burners.map((b, i) => ({
-          pattern_id: `burner-${b.phone}-${i}`,
-          pattern_type: "suspected_burner_phone",
-          confidence: Math.min(0.95, 0.5 + b.calls * 0.08),
-          description: `${b.phone} placed ${b.calls} outgoing calls matching a burner-phone usage pattern.`,
-          explanation: `High call-out volume in a short window with no reciprocal call history is a known burner-phone signature. Threshold: ≥2 calls flagged for review.`,
-          entities: [b.phone],
-          detected_at: new Date().toISOString(),
-          status: "new",
-          source: "burner_heuristic",
-        }));
-        combined = [...burnerPatterns, ...base];
-      }
+      // The API already returns every detected pattern (phone hubs included), so nothing is synthesised here.
+      const combined = await listPatterns();
       setPatterns(combined);
       try {
         const token = getToken();
@@ -72,14 +60,15 @@ export default function Patterns() {
     void user;
   }
 
-  const filtered = patterns.filter((p) => filter === "all" || p.status === filter);
+  const filtered = patterns.filter((p) => (filter === "all" || p.status === filter) && (!womenSafetyOnly || p.women_safety_flag));
+  const womenSafetyCount = patterns.filter((p) => p.women_safety_flag).length;
 
   const countByStatus = (s: string) => patterns.filter((p) => p.status === s).length;
 
   return (
     <main>
       <PageHeader eyebrow="Analytics" title="Pattern Detection">
-        AI-flagged anomalies — burner-phone clusters, financial structuring, and network centrality outliers. Confirm or dismiss each finding to improve future runs.
+        AI-flagged leads — phone hubs, repeat offenders, co-accused clusters, financial structuring and network hubs. Patterns rooted in trafficking-type cases carry a Women Safety badge. Confirm or dismiss each finding to improve future runs.
       </PageHeader>
       <LeadNotice />
 
@@ -139,6 +128,14 @@ export default function Patterns() {
               {f}
             </button>
           ))}
+          <button
+            type="button"
+            className={`chip ${womenSafetyOnly ? "chip-active" : ""}`}
+            aria-pressed={womenSafetyOnly}
+            onClick={() => setWomenSafetyOnly((v) => !v)}
+          >
+            ⚠ Women Safety ({womenSafetyCount})
+          </button>
         </div>
       </div>
 
@@ -155,6 +152,7 @@ export default function Patterns() {
             <div className="pattern-card-top">
               <div style={{ minWidth: 0 }}>
                 <span className="section-label">{p.pattern_type.replace(/_/g, " ")}</span>
+                <WomenSafetyBadge pattern={p} />
                 <p style={{ margin: 0, fontWeight: 600, color: "var(--text)", fontSize: "0.88rem" }}>{p.description}</p>
                 {/* Confidence bar */}
                 <div className="confidence-bar" style={{ width: 180 }}>
@@ -192,7 +190,7 @@ export default function Patterns() {
         {!loading && !filtered.length && <p className="hint">No patterns in this filter.</p>}
       </div>
 
-      {communities.length > 0 && (
+      {communities.length > 0 && !womenSafetyOnly && (
         <section style={{ marginTop: 28 }}>
           <h2>Call-Network Communities (Louvain)</h2>
           <p className="hint" style={{ marginBottom: 12 }}>Auto-discovered calling clusters. Each group contacts each other far more than the rest of the network — consistent with a single operating cell.</p>

@@ -15,6 +15,7 @@ import { clearRecentSearches, getRecentSearches, rememberSearch } from "../lib/r
 import { useAsync } from "../lib/useAsync";
 import { usePageTitle } from "../lib/usePageTitle";
 import ConfidencePill from "../components/ConfidencePill";
+import WomenSafetyBadge from "../components/WomenSafetyBadge";
 import type { AlertRecord } from "../types";
 
 function greeting(): string {
@@ -186,7 +187,7 @@ export default function Dashboard() {
               {strongPatterns.slice(0, 4).map((p) => (
                 <Link key={p.pattern_id} to={`/patterns/${p.pattern_id}`} className="pattern-mini">
                   <div className="pattern-mini-text">
-                    <span className="pattern-mini-type">{p.pattern_type.replace(/_/g, " ")}</span>
+                    <span className="pattern-mini-type">{p.pattern_type.replace(/_/g, " ")} <WomenSafetyBadge pattern={p} showTier={false} /></span>
                     <span className="pattern-mini-desc">{p.description}</span>
                   </div>
                   <ConfidencePill confidence={p.confidence} />

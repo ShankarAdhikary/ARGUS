@@ -68,7 +68,11 @@ export interface PatternRecord {
   entities: string[];
   detected_at: string;
   status: "new" | "confirmed" | "dismissed" | "escalated";
-  source: "burner_heuristic" | "centrality" | "co_location" | "financial_cluster";
+  source: "burner_heuristic" | "centrality" | "co_location" | "financial_cluster" | "graph_recurrence" | "co_accused";
+  /** True only when a meaningful share of the linked FIRs are trafficking / exploitation-of-persons cases. */
+  women_safety_flag?: boolean;
+  women_safety_fir_count?: number;
+  risk_tier?: "HIGH" | "MEDIUM" | "LOW";
 }
 
 export interface CentralityRow {

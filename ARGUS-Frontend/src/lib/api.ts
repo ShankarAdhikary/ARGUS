@@ -386,17 +386,19 @@ export function ingestionHealth() {
   return request<IngestionHealth>("/api/v1/admin/ingestion-health");
 }
 
+export type ReportFormat = "pdf" | "docx";
+
 export interface ReportExportResult {
-  mode: "pdf";
+  mode: ReportFormat;
   blob: Blob;
 }
 
-export async function exportReport(caseRecord: CaseDetail, sections: string[], justification?: string): Promise<ReportExportResult> {
-  const blob = await requestBlob(`/api/v1/reports/export`, {
+export async function exportReport(caseRecord: CaseDetail, sections: string[], justification?: string, format: ReportFormat = "pdf"): Promise<ReportExportResult> {
+  const blob = await requestBlob(`/api/v1/reports/export?format=${format}`, {
     method: "POST",
     body: JSON.stringify({ case_id: caseRecord.case_id, sections, justification }),
   });
-  return { mode: "pdf", blob };
+  return { mode: format, blob };
 }
 
 export function entityTypeGuess(value: string): EntityType {

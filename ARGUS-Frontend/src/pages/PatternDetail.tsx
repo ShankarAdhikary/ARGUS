@@ -5,7 +5,8 @@ import LeadNotice from "../components/LeadNotice";
 import ConfidencePill from "../components/ConfidencePill";
 import NetworkGraph from "../components/NetworkGraph";
 import SourceChip from "../components/SourceChip";
-import { burners, listPatterns, networkPhone, patternFeedback } from "../lib/api";
+import WomenSafetyBadge from "../components/WomenSafetyBadge";
+import { listPatterns, networkAccused, networkPhone, patternFeedback } from "../lib/api";
 import type { EntityType, GraphElements, PatternRecord } from "../types";
 
 export default function PatternDetail() {
@@ -16,22 +17,8 @@ export default function PatternDetail() {
 
   useEffect(() => {
     async function load() {
-      const [base, burnerData] = await Promise.all([listPatterns(), burners(2)]);
-      let found = base.find((p) => p.pattern_id === id) ?? null;
-      if (!found && burnerData?.burners?.length) {
-        const burnerPatterns: PatternRecord[] = burnerData.burners.map((b, i) => ({
-          pattern_id: `burner-${b.phone}-${i}`,
-          pattern_type: "suspected_burner_phone",
-          confidence: Math.min(0.95, 0.5 + b.calls * 0.08),
-          description: `${b.phone} placed ${b.calls} outgoing calls matching a burner-phone usage pattern.`,
-          explanation: `High call-out volume in a short window with no reciprocal call history is a known burner-phone signature. Threshold: ≥2 calls flagged for review.`,
-          entities: [b.phone],
-          detected_at: new Date().toISOString(),
-          status: "new",
-          source: "burner_heuristic",
-        }));
-        found = burnerPatterns.find((p) => p.pattern_id === id) ?? null;
-      }
+      const base = await listPatterns();
+      const found = base.find((p) => p.pattern_id === id) ?? null;
       setPattern(found);
       if (found) {
         if (found.source === "burner_heuristic") {
@@ -47,6 +34,27 @@ export default function PatternDetail() {
             });
           }
           setGraph({ nodes, edges });
+        } else if (found.source === "graph_recurrence" || found.source === "co_accused") {
+          // Show the people and the FIRs that tie them together, from the real accused network.
+          const people = Array.from(new Set(found.entities)).slice(0, 2);
+          const firsByPerson = await Promise.all(
+            people.map(async (name) => {
+              const net = (await networkAccused(name).catch(() => null)) as Record<string, unknown> | null;
+              return Array.isArray(net?.linked_firs) ? (net!.linked_firs as string[]) : [];
+            })
+          );
+          const shown = found.source === "co_accused" && firsByPerson.length === 2
+            ? firsByPerson[0].filter((fir) => firsByPerson[1].includes(fir))      // FIRs both were named in
+            : (firsByPerson[0] ?? []).slice(0, 30);
+          const nodes: GraphElements["nodes"] = people.map((p) => ({ data: { id: `person:${p}`, label: p, type: "person" as EntityType } }));
+          const edges: GraphElements["edges"] = [];
+          shown.forEach((fir, i) => {
+            nodes.push({ data: { id: `fir:${fir}`, label: fir, type: "fir" as EntityType } });
+            people.forEach((p, j) => {
+              if (found.source === "co_accused" || j === 0) edges.push({ data: { id: `f${i}-${j}`, source: `person:${p}`, target: `fir:${fir}`, label: "named in", direct: true } });
+            });
+          });
+          setGraph({ nodes, edges });
         } else {
           const nodes: GraphElements["nodes"] = found.entities.map((e, i) => ({ data: { id: `n${i}`, label: e, type: guessType(e) } }));
           const edges: GraphElements["edges"] = nodes.slice(1).map((n, i) => ({
@@ -61,11 +69,10 @@ export default function PatternDetail() {
 
   async function act(verdict: "useful" | "false_positive" | "escalated") {
     if (!pattern) return;
-    if (pattern.source !== "burner_heuristic") {
-      const updated = await patternFeedback(pattern.pattern_id, verdict);
-      setPattern(updated);
-    } else {
-      setPattern({ ...pattern, status: verdict === "useful" ? "confirmed" : verdict === "escalated" ? "escalated" : "dismissed" });
+    try {
+      setPattern(await patternFeedback(pattern.pattern_id, verdict));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save your verdict.");
     }
   }
 
@@ -75,7 +82,7 @@ export default function PatternDetail() {
   return (
     <main>
       <PageHeader eyebrow={pattern.pattern_type.replace(/_/g, " ")} title={pattern.description}>
-        <ConfidencePill confidence={pattern.confidence} />
+        <ConfidencePill confidence={pattern.confidence} /> <WomenSafetyBadge pattern={pattern} />
       </PageHeader>
       <LeadNotice />
 

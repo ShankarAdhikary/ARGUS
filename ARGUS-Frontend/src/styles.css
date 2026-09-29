@@ -1099,3 +1099,14 @@ a.stat-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 
 /* White text on the primary colour must clear 4.5:1 */
 .primary-link, a.primary-link, .login-submit, .home-btn.primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
 .primary-link:hover, a.primary-link:hover, .login-submit:hover:not(:disabled), .home-btn.primary:hover { background: #4338ca; border-color: #4338ca; color: #fff; }
+
+/* ── Women-safety badge ── */
+.ws-badges { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.ws-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 700; letter-spacing: .02em;
+  color: #fecaca; background: rgba(239,68,68,.16); border: 1px solid rgba(239,68,68,.5); }
+.tier-pill { padding: 3px 9px; border-radius: 20px; font-size: .75rem; font-weight: 600; border: 1px solid var(--border-2); color: var(--text-2); }
+.tier-high { color: #fecaca; border-color: rgba(239,68,68,.4); }
+.tier-medium { color: var(--amber); border-color: rgba(245,158,11,.4); }
+
+.format-picker { border: 1px solid var(--border-2); border-radius: var(--radius-md); padding: 10px 14px; margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.format-picker legend { padding: 0 6px; font-size: .8125rem; color: var(--text-2); }

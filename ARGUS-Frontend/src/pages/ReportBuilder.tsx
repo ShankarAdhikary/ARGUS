@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
 import ConfidencePill from "../components/ConfidencePill";
 import { exportReport, getCase, listPatterns, logAudit } from "../lib/api";
+import type { ReportFormat } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { CaseDetail, PatternRecord } from "../types";
 
@@ -17,6 +18,9 @@ export default function ReportBuilder() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [justification, setJustification] = useState("");
   const [busy, setBusy] = useState(false);
+  const [format, setFormat] = useState<ReportFormat>("pdf");
+  // Same rule as the export: only patterns that involve entities pinned to this case.
+  const casePatterns = patterns.filter((p) => caseRecord?.entities.some((e) => p.entities.includes(e.entity_value)));
   const [status, setStatus] = useState("");
 
   const [loadError, setLoadError] = useState("");
@@ -53,12 +57,12 @@ export default function ReportBuilder() {
     }
     setBusy(true);
     try {
-      const result = await exportReport(caseRecord, sections, justification || undefined);
+      const result = await exportReport(caseRecord, sections, justification || undefined, format);
       logAudit("export_report", caseRecord.title, user, justification || undefined);
       const url = URL.createObjectURL(result.blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${caseRecord.fir_number}-report.pdf`;
+      a.download = format === "docx" ? `argus-report-${caseRecord.case_id}.docx` : `${caseRecord.fir_number}-report.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       setStatus("Export logged to audit trail.");
@@ -132,7 +136,9 @@ export default function ReportBuilder() {
           {sections.includes("Pattern Findings") && (
             <div className="report-section">
               <h3>Pattern findings</h3>
-              <ul>{patterns.map((p) => <li key={p.pattern_id}>{p.description} <ConfidencePill confidence={p.confidence} /></li>)}</ul>
+              {casePatterns.length
+                ? <ul>{casePatterns.map((p) => <li key={p.pattern_id}>{p.description} <ConfidencePill confidence={p.confidence} /> <span className="hint">AI-derived lead — verify before use</span></li>)}</ul>
+                : <p className="hint">No detected patterns involve this case's pinned entities.</p>}
             </div>
           )}
           {sections.includes("Source Citations") && (
@@ -149,9 +155,19 @@ export default function ReportBuilder() {
             </label>
           )}
 
+          <fieldset className="format-picker">
+            <legend>File format</legend>
+            {(["pdf", "docx"] as const).map((f) => (
+              <label key={f} className="checkbox-row">
+                <input type="radio" name="report-format" value={f} checked={format === f} onChange={() => setFormat(f)} />
+                {f === "pdf" ? "PDF (fixed layout, for filing)" : "Word .docx (editable)"}
+              </label>
+            ))}
+          </fieldset>
+
           <div className="page-actions" style={{ marginTop: 16 }}>
             <button className="secondary" onClick={() => setStep(2)}>Back</button>
-            <button onClick={doExport} disabled={busy}>{busy ? "Exporting…" : "Export report"}</button>
+            <button onClick={doExport} disabled={busy}>{busy ? "Exporting…" : `Export ${format.toUpperCase()}`}</button>
           </div>
           {status && <p className="hint">{status}</p>}
         </section>
