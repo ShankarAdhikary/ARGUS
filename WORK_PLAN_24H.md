@@ -13,7 +13,13 @@ Done since the original plan:
 - Face index is now persistent and shared across workers (`FACE_INDEX_DIR`, default `uploads/face_index`), inference runs off the event loop, models warm up at startup, and deleting a suspect also removes their face. `scripts/rebuild_face_index.py` restores the index from Elasticsearch.
 - Network graph readability (leaf FIRs collapse behind a toggle) and a working timeline snapshot.
 
-Still open (production, not MVP): MFA/SSO, TLS + encryption at rest, secrets vault, Postgres RLS and jurisdiction scoping of search/graph, local Hindi/regional NER, real CCTNS/ICJS/NATGRID connectors, Kubernetes/HA, load testing, DOCX reports, Hindi UI, CERT-In/STQC audits.
+Also done since (production hardening):
+- Built-in TOTP two-step verification (opt-in per user, mandatory per role via `MFA_REQUIRED_ROLES`); optional Keycloak/OIDC token verification (backend only, off by default).
+- Search, dossier and the accused network are scoped by jurisdiction; Postgres row-level security protects cases, notes and pinned entities at the database (each request runs as a restricted role).
+- Women-safety pattern intelligence (evidence-based flag), repeat-offender and co-accused patterns; Word (.docx) report export; optional Hindi NER fallback (off by default, not yet tried against the real model).
+- Load test (`tests/load/locustfile.py`): 50 users / 60 s, 0 failures, search p95 ~180 ms. Keep-alive raised to 65 s after the test exposed dropped idle connections.
+
+Still open (production, not MVP): TLS + encryption at rest, secrets vault, jurisdiction scoping of the phone/financial/path graph endpoints, analytics and patterns, a browser SSO flow, real CCTNS/ICJS/NATGRID connectors, Kubernetes/HA, Hindi UI, CERT-In/STQC audits, running the Hindi model for real.
 
 Known caveats: the `ingestion_pipeline` integration tests mutate data and were not run against the demo stack; two integration tests skip by design (need the AML seed / regex-only mode).
 

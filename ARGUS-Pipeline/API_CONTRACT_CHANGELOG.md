@@ -100,3 +100,54 @@ the application and regenerating this file in the same change.
 - API container: 4 CPUs and TensorFlow/BLAS thread limits (`OMP_NUM_THREADS`, `TF_NUM_INTRAOP_THREADS`, ...) matched to the quota. The host reports 12 cores, so
   the defaults oversubscribed the 2-CPU quota and throttled inference. A face embedding went from ~40 s to ~7 s. RetinaFace detection is still ~85% of that time;
   a lighter detector (needs its weights available offline) is the next step.
+
+## Jurisdiction scoping of search and graph (FR-10)
+- FIR records now carry a `jurisdiction` (Elasticsearch document and Neo4j `FIR` node), derived from the station via `jurisdictions.py`
+  (synthetic demo mapping — replace with the real police-station master). New records get it at ingest; existing ones via
+  `scripts/backfill_jurisdiction.py`. Stations with no mapping are `Unassigned` and visible only to unscoped roles.
+- `GET /search/firs`, `/search/master-dossier`, `/search/judges-view` filter to the caller's jurisdiction for `investigator`
+  (admin, supervisor and analyst are unscoped, matching case access).
+- `GET /network/accused` lists only in-scope FIRs for scoped callers. If none are in scope the answer is
+  `{"status":"success","message":"No results in your jurisdiction."}` — identical to a person who does not exist, never a 403.
+- `log_action(..., extra=...)` stores structured `details` on audit rows (included in the hash only when present, so old rows still verify);
+  these endpoints record `jurisdiction_filter` and the result count. `GET /audit` returns `details`.
+- NOT yet scoped: `/network/phone`, `/network/financial`, `/network/path`, `/analytics/*`, `/patterns`, `/alerts` and the biometric hunt.
+
+## Women-safety pattern intelligence
+- `GET /patterns` now also returns `repeat_offender_recurrence` (suspects linked to 3+ FIRs) and `co_accused_cluster` (pairs named together in 2+ FIRs).
+  The former `burner_phone_cluster` type is renamed `phone_cluster_hub` (ids keep the `burner-` prefix so saved analyst verdicts stay valid).
+- New optional fields: `women_safety_flag`, `women_safety_fir_count`, `risk_tier` (HIGH/MEDIUM for the two new types), `entity_ids`.
+- `women_safety_flag` is evidence-based: true only when at least `WOMEN_SAFETY_MIN_FIRS` (3; 2 for clusters) of the underlying FIRs — and at least
+  `WOMEN_SAFETY_MIN_SHARE` (30%) — are trafficking / exploitation-of-persons cases (FIR `network = trafficking`, or text about minors/women/stalking/etc.).
+  The `explanation` states the count and share either way.
+- The two new pattern queries respect jurisdiction scoping (investigators only see recurrence within their own jurisdiction). Hub, financial and
+  centrality patterns are still unscoped.
+- Frontend: removed a legacy block that added ~200 synthetic "suspected burner" cards on the Patterns page; verdicts on phone hubs now persist from the detail page.
+
+## Production hardening (phase 2)
+
+**Word reports.** `POST /reports/export?format=pdf|docx` (default `pdf`). The `.docx` has the case metadata table, the selected sections, an
+"AI-derived lead — verify before use" line under every pattern, and an audit footer ("Exported by … at …, justification: …"). Served as
+`Content-Disposition: attachment; filename=argus-report-{case_id}.docx`; the export is audited with `details.format`. Both formats now list only
+patterns that involve the case's pinned entities (previously every pattern in the system). Unknown formats return 422; the sensitive-case gate (428) applies to both.
+
+**Row-level security (Postgres).** `cases`, `case_notes` and `case_entity_links` have RLS enabled and forced. The service connects as the database superuser,
+which ignores RLS, so each authenticated request's transaction runs `SET LOCAL ROLE argus_rls` (a NOLOGIN role created at start-up) with `app.role` and
+`app.jurisdiction` set from the caller; the policy admits a row when its jurisdiction matches or the role is admin/supervisor/analyst (the same
+`CROSS_JURISDICTION_ROLES` tuple the API uses). No context = no rows for the restricted role (fail closed); start-up, login and the ingest worker run as the
+service user. Behaviour change: another district's case now answers **404** to a scoped officer (it used to be 403), so its existence is not revealed.
+`get_cursor` now always ends its transaction (it used to leave read-only transactions open on pooled connections). Disable with `ENABLE_DB_RLS=false`.
+
+**Hindi NER fallback.** When no LLM answers and the text contains Devanagari, `extract_candidates` can use `ai4bharat/IndicNER`
+(`extraction_method: "indic_ner"`; PER/ORG/LOC mapped to person/organization/location, plus phone numbers with Devanagari digits normalised).
+Off by default (`ENABLE_INDIC_NER=false`). The dependencies (`transformers`, `torch`) live in `requirements-indic.txt` and are installed only with
+`docker compose build --build-arg INSTALL_INDIC_NER=true api` because they add gigabytes to the image. Not yet exercised against the real model.
+
+**Keycloak / OIDC.** With `KEYCLOAK_URL` set, `Authorization: Bearer` tokens must be access tokens from that realm: signature checked against the realm's
+JWKS (asymmetric algorithms only), plus issuer, audience (`KEYCLOAK_AUDIENCE`) and expiry. Roles come from `realm_access.roles` (most privileged of
+admin/supervisor/analyst/investigator wins; none = 403); `preferred_username`, `name` and a `jurisdiction` claim fill the rest. ARGUS's own tokens are then
+rejected and `/auth/login` plus the MFA endpoints answer 400. Unset (the default) leaves everything as it was. The web app does not yet perform the OIDC redirect flow.
+
+**Server.** `uvicorn --timeout-keep-alive 65` (the 5 s default dropped idle connections that clients were about to reuse: `RemoteDisconnected` on the first request after a pause).
+
+**Load test.** `tests/load/locustfile.py` (locust). 50 users / 60 s against the demo stack: 6,450 requests, 0 failures, search p95 ≈ 180 ms (target 3,000 ms).
