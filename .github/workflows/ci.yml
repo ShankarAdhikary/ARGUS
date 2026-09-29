@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ARGUS-Pipeline
+    env:
+      ARGUS_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ARGUS-Pipeline/requirements-ci.txt
+      # The unit tests stub the databases and heavy ML libraries, so only a few small packages are needed.
+      - run: pip install -r requirements-ci.txt
+      - run: python -m pytest tests/unit -q
+
+  frontend:
+    name: Frontend type-check and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ARGUS-Frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ARGUS-Frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  compose:
+    name: Docker Compose config is valid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Generate a throw-away .env exactly as a new user would, then have Compose validate the stack definition.
+      - run: python3 ARGUS-Pipeline/scripts/init_env.py
+      - run: docker compose config --quiet
