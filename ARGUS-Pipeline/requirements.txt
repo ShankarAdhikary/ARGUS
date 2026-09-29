@@ -14,7 +14,7 @@ deepface>=0.0.93
 # unless the legacy tf-keras shim is installed.
 tf-keras>=2.16
 networkx>=3.4,<4
-psycopg2-binary>=2.9,<3
+psycopg2-binary>=2.9.13,<3
 PyJWT>=2.8,<3
 rapidfuzz>=3.9,<4
 fpdf2>=2.7,<3
