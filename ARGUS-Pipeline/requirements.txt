@@ -9,7 +9,7 @@ pydantic>=2.0,<3
 numpy>=1.26,<3
 faiss-cpu>=1.8
 opencv-python-headless>=4.10
-deepface>=0.0.93
+deepface>=0.0.101
 # deepface's retinaface backend refuses to import under Keras 3 (TF >= 2.16)
 # unless the legacy tf-keras shim is installed.
 tf-keras>=2.16
