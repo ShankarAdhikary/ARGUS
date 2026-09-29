@@ -431,3 +431,28 @@ class TestMfaCore:
         token = create_purpose_token("00000000-0000-0000-0000-000000000099", "mfa")
         response = TestClient(app).get("/api/v1/cases", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 401
+
+
+class TestWomenSafetyFlag:
+    """The badge must reflect real trafficking-type FIRs, not be stamped on everything."""
+
+    def test_flag_needs_enough_fir_and_enough_share(self):
+        from platform_api import _women_safety_assessment
+        relevant = {f"T{i}" for i in range(10)}
+        # 4 of 10 linked FIRs are trafficking cases -> flagged
+        flag, hits, share = _women_safety_assessment([f"T{i}" for i in range(4)] + [f"X{i}" for i in range(6)], relevant)
+        assert flag and hits == 4 and share == 0.4
+        # plenty of trafficking FIRs but a tiny share of a huge record -> not flagged
+        assert _women_safety_assessment([f"T{i}" for i in range(3)] + [f"X{i}" for i in range(60)], relevant)[0] is False
+        # a high share but too few FIRs -> not flagged
+        assert _women_safety_assessment(["T1", "T2"], relevant)[0] is False
+        assert _women_safety_assessment([], relevant) == (False, 0, 0.0)
+
+    def test_cluster_threshold_is_lower_because_shared_cases_are_few(self):
+        from platform_api import _women_safety_assessment
+        assert _women_safety_assessment(["T1", "T2", "X1"], {"T1", "T2"}, min_firs=2)[0] is True
+
+    def test_sentence_states_the_evidence(self):
+        from platform_api import _women_safety_sentence
+        assert "26 of the linked FIRs (43%)" in _women_safety_sentence(True, 26, 0.43, "X")
+        assert "none of the linked FIRs" in _women_safety_sentence(False, 0, 0.0, "X")

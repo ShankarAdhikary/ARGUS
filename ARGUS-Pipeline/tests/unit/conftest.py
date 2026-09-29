@@ -51,6 +51,10 @@ sys.modules["elasticsearch"].Elasticsearch = MagicMock(
     return_value=MagicMock(ping=MagicMock(return_value=True))
 )
 
+# platform_api imports elasticsearch.helpers (bulk scans); the stub needs the attribute
+sys.modules["elasticsearch"].helpers = MagicMock()
+sys.modules["elasticsearch.helpers"] = sys.modules["elasticsearch"].helpers
+
 # Give minio a realistic Minio class
 sys.modules["minio"].Minio = MagicMock(return_value=MagicMock())
 

@@ -19,6 +19,7 @@ from config import (
     REDIS_PASSWORD,
     REDIS_PORT,
 )
+from jurisdictions import jurisdiction_for_station
 from platform_api import check_and_fire_alerts
 
 redis_client = redis.Redis(
@@ -96,6 +97,9 @@ def process_queue():
             if dataset_type == "fir":
                 touched_entities = []
                 for record in file_data:
+                    # Every FIR is stamped with the jurisdiction that owns its station, so search and graph
+                    # results can be scoped to it. An explicit value in the file wins.
+                    record.setdefault("jurisdiction", jurisdiction_for_station(record.get("station")))
                     es_client.index(
                         index="argus-firs", id=record.get("fir_id"), document=record
                     )
@@ -108,7 +112,7 @@ def process_queue():
                             MERGE (s:Suspect {id: $suspect_id})
                             MERGE (f:FIR {id: $fir_id})
                             MERGE (s)-[link:LINKED_TO_FIR]->(f)
-                            SET f.date = $date, link.date = $date, link.source_record_id = $fir_id
+                            SET f.date = $date, f.jurisdiction = $jurisdiction, link.date = $date, link.source_record_id = $fir_id
                             // Without this the suspect/FIR records and the call
                             // graph stay disconnected, so no network path exists
                             // between a named person and the numbers they use.
@@ -121,6 +125,7 @@ def process_queue():
                             fir_id=record.get("fir_id"),
                             mobile=mobile,
                             date=record.get("date"),
+                            jurisdiction=record["jurisdiction"],
                         )
                     touched_entities.append(accused)
                     if mobile:

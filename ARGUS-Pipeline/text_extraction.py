@@ -48,7 +48,7 @@ class ExtractedRelationship(BaseModel):
 class ExtractionResult(BaseModel):
     entities: list[ExtractedEntity]
     relationships: list[ExtractedRelationship]
-    extraction_method: Literal["groq_zero_shot", "gemini_zero_shot", "regex_fallback"]
+    extraction_method: Literal["groq_zero_shot", "gemini_zero_shot", "indic_ner", "regex_fallback"]
 
 
 EXTRACTION_SCHEMA = {
@@ -221,5 +221,13 @@ def extract_candidates(text: str) -> ExtractionResult:
         except RuntimeError as exc:
             # A demo must stay runnable even if the provider is down, but the
             # fallback used to be silent — log it so a degraded run is visible.
-            print(f"[!] LLM extraction unavailable, using regex fallback: {exc}")
+            print(f"[!] LLM extraction unavailable, trying fallbacks: {exc}")
+    # Hindi text: the regex fallback only understands Latin script, so try the Indic NER model if it is switched on.
+    from indic_ner import extract_indic, has_devanagari, is_enabled  # imported here: indic_ner imports this module
+
+    if is_enabled() and has_devanagari(text):
+        try:
+            return extract_indic(text)
+        except RuntimeError as exc:
+            print(f"[!] Indic NER unavailable, using regex fallback: {exc}")
     return _regex_fallback(text)

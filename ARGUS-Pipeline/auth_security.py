@@ -18,6 +18,8 @@ from typing import Optional
 import jwt
 from fastapi import Header, HTTPException
 
+import config
+from request_context import set_request_user
 from config import JWT_ALGORITHM, JWT_EXPIRE_MINUTES, JWT_SECRET, MFA_ENCRYPTION_KEY, MFA_ISSUER
 
 PBKDF2_ITERATIONS = 200_000
@@ -62,22 +64,97 @@ def decode_access_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid authentication token.")
 
 
-def get_current_user(authorization: Optional[str] = Header(default=None)) -> dict:
+# ---------------------------------------------------------------------------
+# Optional OIDC (Keycloak) verification
+# ---------------------------------------------------------------------------
+
+_ARGUS_ROLES_BY_PRIVILEGE = ("admin", "supervisor", "analyst", "investigator")
+_OIDC_ALGORITHMS = ["RS256", "RS384", "RS512", "ES256", "ES384"]  # asymmetric only: a shared-secret (HS*) token is never accepted
+_jwk_client = None
+
+
+def oidc_enabled() -> bool:
+    return bool(config.KEYCLOAK_URL)
+
+
+def _oidc_issuer() -> str:
+    return config.KEYCLOAK_ISSUER or f"{config.KEYCLOAK_URL}/realms/{config.KEYCLOAK_REALM}"
+
+
+def _jwks():
+    global _jwk_client
+    if _jwk_client is None:
+        from jwt import PyJWKClient
+
+        _jwk_client = PyJWKClient(
+            f"{config.KEYCLOAK_URL}/realms/{config.KEYCLOAK_REALM}/protocol/openid-connect/certs",
+            cache_keys=True, lifespan=3600, timeout=5,
+        )
+    return _jwk_client
+
+
+def decode_oidc_token(token: str) -> dict:
+    """Verify a Keycloak access token: signature (via the realm's JWKS), issuer, audience and expiry."""
+    try:
+        signing_key = _jwks().get_signing_key_from_jwt(token).key
+        return jwt.decode(
+            token, signing_key, algorithms=_OIDC_ALGORITHMS,
+            audience=config.KEYCLOAK_AUDIENCE, issuer=_oidc_issuer(),
+            options={"require": ["exp", "iss", "sub"]},
+        )
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
+    except jwt.PyJWKClientConnectionError:
+        raise HTTPException(status_code=503, detail="Identity provider is unreachable.")
+    except (jwt.InvalidTokenError, jwt.PyJWKClientError):
+        raise HTTPException(status_code=401, detail="Invalid authentication token.")
+
+
+def _claim(payload: dict, dotted: str):
+    value = payload
+    for part in dotted.split("."):
+        value = value.get(part) if isinstance(value, dict) else None
+    return value
+
+
+def user_from_oidc_claims(payload: dict) -> dict:
+    """Map a verified Keycloak token onto the user dict the rest of ARGUS uses."""
+    roles = _claim(payload, config.KEYCLOAK_ROLE_CLAIM) or []
+    role = next((r for r in _ARGUS_ROLES_BY_PRIVILEGE if r in roles), None)  # most privileged ARGUS role wins
+    if role is None:
+        raise HTTPException(status_code=403, detail="Your account has no ARGUS role assigned.")
+    username = payload.get("preferred_username") or payload["sub"]
+    return {
+        "user_id": payload["sub"],
+        "employee_id": username,
+        "full_name": payload.get("name") or username,
+        "role": role,
+        "jurisdiction": str(payload.get(config.KEYCLOAK_JURISDICTION_CLAIM) or ""),
+    }
+
+
+async def get_current_user(authorization: Optional[str] = Header(default=None)) -> dict:
     """FastAPI dependency: extracts and validates the Bearer token."""
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing or malformed Authorization header.")
     token = authorization.split(" ", 1)[1].strip()
+    if oidc_enabled():
+        user = user_from_oidc_claims(decode_oidc_token(token))   # ARGUS's own tokens are not accepted in this mode
+        set_request_user(user)
+        return user
     payload = decode_access_token(token)
     if payload.get("purpose"):
         # Short-lived MFA step tokens must never work as session tokens.
         raise HTTPException(status_code=401, detail="Invalid authentication token.")
-    return {
+    user = {
         "user_id": payload["sub"],
         "employee_id": payload["employee_id"],
         "full_name": payload["full_name"],
         "role": payload["role"],
         "jurisdiction": payload["jurisdiction"],
     }
+    set_request_user(user)  # lets the database layer apply row-level security for this caller
+    return user
 
 
 def require_role(*roles: str):

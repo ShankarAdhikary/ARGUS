@@ -6,12 +6,14 @@ ship. Wired into `main.py` via `app.include_router(platform_router)`.
 
 import json
 import os
+import re
 import threading
 import time
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import networkx as nx
+from elasticsearch import Elasticsearch, helpers as es_helpers
 import redis
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -23,6 +25,8 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from audit import log_action, verify_chain
+from report_docx import build_case_docx
+from request_context import CROSS_JURISDICTION_ROLES
 from auth_security import (
     create_access_token,
     create_purpose_token,
@@ -31,6 +35,7 @@ from auth_security import (
     encrypt_secret,
     get_current_user,
     hash_recovery_code,
+    oidc_enabled,
     new_recovery_codes,
     new_totp_secret,
     provisioning_uri,
@@ -38,7 +43,7 @@ from auth_security import (
     verify_password,
     verify_totp,
 )
-from config import LOGIN_LOCKOUT_SECONDS, MFA_REQUIRED_ROLES, LOGIN_MAX_FAILURES, NEO4J_PASSWORD, NEO4J_URI, NEO4J_USER, REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
+from config import ELASTICSEARCH_URL, ES_AUTH_KWARGS, LOGIN_LOCKOUT_SECONDS, MFA_REQUIRED_ROLES, LOGIN_MAX_FAILURES, NEO4J_PASSWORD, NEO4J_URI, NEO4J_USER, REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
 from db import get_cursor
 
 router = APIRouter(prefix="/api/v1")
@@ -91,8 +96,14 @@ def _lockout_key(employee_id: str) -> str:
     return f"argus:login_fail:{employee_id.lower()}"
 
 
+def _local_auth_only() -> None:
+    if oidc_enabled():
+        raise HTTPException(status_code=400, detail="Sign-in is handled by the organisation's identity provider.")
+
+
 @router.post("/auth/login")
 async def login(payload: LoginRequest):
+    _local_auth_only()
     # Brute-force protection. If Redis is unreachable we fail open (availability) but still audit.
     key = _lockout_key(payload.employee_id)
     try:
@@ -163,6 +174,7 @@ class MfaCodeRequest(BaseModel):
 
 
 def _load_user(user_id: str) -> dict:
+    _local_auth_only()
     with get_cursor() as cur:
         cur.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
         user = cur.fetchone()
@@ -346,6 +358,8 @@ async def admin_mfa_reset(employee_id: str, current_user: dict = Depends(require
 
 @router.get("/auth/me")
 async def me(current_user: dict = Depends(get_current_user)):
+    if oidc_enabled():
+        return {k: current_user[k] for k in ("user_id", "employee_id", "full_name", "role", "jurisdiction")}
     with get_cursor() as cur:
         cur.execute("SELECT * FROM users WHERE user_id = %s", (current_user["user_id"],))
         user = cur.fetchone()
@@ -397,7 +411,16 @@ def _case_summary_row(row: dict) -> dict:
 
 
 # Roles with cross-jurisdiction oversight; everyone else is limited to their own jurisdiction (FR-10).
-CROSS_JURISDICTION_ROLES = ("admin", "supervisor", "analyst")
+
+
+def search_scope(current_user: dict) -> Optional[str]:
+    """Jurisdiction that search and graph results must be limited to, or None for roles that see everything.
+
+    Uses the same role split as case access, so an officer sees the same slice of the system everywhere.
+    """
+    if current_user["role"] in CROSS_JURISDICTION_ROLES:
+        return None
+    return current_user["jurisdiction"]
 
 
 def _assert_case_scope(detail: dict, current_user: dict) -> None:
@@ -934,14 +957,10 @@ def _verdict_to_status(verdict: Optional[str]) -> str:
     return {"useful": "confirmed", "false_positive": "dismissed", "escalated": "escalated"}.get(verdict, "new")
 
 
-@router.get("/patterns")
-async def list_patterns(current_user: dict = Depends(get_current_user)):
-    feedback = _pattern_feedback_map()
+async def _base_patterns(feedback: dict) -> list[dict]:
     if time.monotonic() - _patterns_cache["at"] < _PATTERNS_TTL and _patterns_cache["rows"]:
         # Graph scan is cached briefly; analyst verdicts are always applied fresh.
-        fresh = [{**p, "status": _verdict_to_status(feedback.get(p["pattern_id"]))} for p in _patterns_cache["rows"]]
-        log_action(current_user, action="list_patterns", resource="patterns")
-        return fresh
+        return [{**p, "status": _verdict_to_status(feedback.get(p["pattern_id"]))} for p in _patterns_cache["rows"]]
     now = datetime.now(timezone.utc).isoformat()
     patterns: list[dict] = []
 
@@ -959,22 +978,46 @@ async def list_patterns(current_user: dict = Depends(get_current_user)):
         ]
         cutoff = burner_cutoff([n for _, n in call_rows])
         top_calls = call_rows[0][1] if call_rows else 1
-        for phone, call_count in call_rows:
-            if call_count < cutoff:
-                break
-            pattern_id = f"burner-{phone}"
+        hubs = [(phone, n) for phone, n in call_rows if n >= cutoff]
+        # FIRs of the people who use each hub phone, to see whether the phone sits inside trafficking-type cases.
+        hub_firs = {
+            row["phone"]: row["firs"]
+            for row in session.run(
+                "MATCH (p:Phone)<-[:USES_PHONE]-(:Suspect)-[:LINKED_TO_FIR]->(f:FIR) WHERE p.id IN $ids "
+                "RETURN p.id AS phone, collect(DISTINCT f.id) AS firs",
+                ids=[phone for phone, _ in hubs],
+            )
+        }
+        relevant_firs = await run_in_threadpool(_women_safety_fir_ids)
+        for phone, call_count in hubs:
+            pattern_id = f"burner-{phone}"  # id prefix kept so existing analyst feedback and links stay valid
             confidence = round(min(0.6 + 0.37 * call_count / top_calls, 0.97), 2)
+            flag, ws_count, ws_share = _women_safety_assessment(hub_firs.get(phone, []), relevant_firs)
             patterns.append(
                 {
                     "pattern_id": pattern_id,
-                    "pattern_type": "burner_phone_cluster",
+                    "pattern_type": "phone_cluster_hub",
                     "confidence": confidence,
-                    "description": f"Phone {phone} placed {call_count} calls, far above typical volume.",
-                    "explanation": f"{call_count} outgoing calls from {phone} put it in the top {round((1 - BURNER_PERCENTILE) * 100)}% of callers (threshold: {cutoff}+ calls out of {len(call_rows)} phones), matching a burner-phone usage signature.",
+                    "description": (
+                        f"Phone {phone} made {call_count} outgoing calls — hub in a potential recruitment/coordination network. "
+                        + (
+                            "High call volume may indicate trafficker coordination or harassment campaign management."
+                            if flag  # only suggest this when the people behind the phone are tied to trafficking-type FIRs
+                            else "High call volume may indicate coordination activity."
+                        )
+                    ),
+                    "explanation": (
+                        f"{call_count} outgoing calls from {phone} put it in the top {round((1 - BURNER_PERCENTILE) * 100)}% of callers "
+                        f"(threshold: {cutoff}+ calls out of {len(call_rows)} phones). "
+                        + _women_safety_sentence(flag, ws_count, ws_share, "the people who use this phone")
+                    ),
                     "entities": [phone],
+                    "entity_ids": [phone],
                     "detected_at": now,
                     "status": _verdict_to_status(feedback.get(pattern_id)),
                     "source": "burner_heuristic",
+                    "women_safety_flag": flag,
+                    "women_safety_fir_count": ws_count,
                 }
             )
         financial_result = session.run(
@@ -1028,8 +1071,145 @@ async def list_patterns(current_user: dict = Depends(get_current_user)):
         )
 
     _patterns_cache.update(at=time.monotonic(), rows=patterns)
-    log_action(current_user, action="list_patterns", resource="patterns")
     return patterns
+
+
+# ---------------------------------------------------------------------------
+# Women-safety intelligence
+# ---------------------------------------------------------------------------
+#
+# A pattern is flagged only when the FIRs behind it are actually trafficking / exploitation-of-persons cases,
+# so the badge means something. Blanket-flagging every repeat offender would label people with no basis.
+
+_WS_NETWORKS = {"trafficking"}
+_WS_TERMS = re.compile(r"\b(minor|women|woman|girl|girls|stalk\w*|domestic violence|dowry|sexual\w*)\b", re.I)
+WS_MIN_SHARE = float(os.getenv("WOMEN_SAFETY_MIN_SHARE", "0.30"))
+WS_MIN_FIRS_REPEAT = int(os.getenv("WOMEN_SAFETY_MIN_FIRS", "3"))
+WS_MIN_FIRS_CLUSTER = 2
+_es = Elasticsearch(ELASTICSEARCH_URL, headers={"Accept": "application/vnd.elasticsearch+json; compatible-with=8"}, **ES_AUTH_KWARGS)
+_ws_cache: dict = {"at": 0.0, "ids": set()}
+_ws_extra_cache: dict = {}
+
+
+def _women_safety_fir_ids() -> set:
+    """IDs of FIRs that concern trafficking or exploitation of persons (from the FIR's network label and text)."""
+    if time.monotonic() - _ws_cache["at"] < _PATTERNS_TTL * 5 and _ws_cache["ids"]:
+        return _ws_cache["ids"]
+    ids = set()
+    for hit in es_helpers.scan(_es, index="argus-firs", query={"query": {"match_all": {}}}, _source=["fir_id", "network", "description"]):
+        src = hit["_source"]
+        if (src.get("network") in _WS_NETWORKS) or _WS_TERMS.search(str(src.get("description") or "")):
+            ids.add(src.get("fir_id") or hit["_id"])
+    _ws_cache.update(at=time.monotonic(), ids=ids)
+    return ids
+
+
+def _women_safety_assessment(fir_ids, relevant: set, min_firs: int = WS_MIN_FIRS_REPEAT) -> tuple[bool, int, float]:
+    unique = set(fir_ids)
+    hits = len(unique & relevant)
+    share = hits / len(unique) if unique else 0.0
+    return (hits >= min_firs and share >= WS_MIN_SHARE), hits, share
+
+
+def _women_safety_sentence(flag: bool, hits: int, share: float, subject: str) -> str:
+    if flag:
+        return f"Women-safety relevance: {hits} of the linked FIRs ({round(share * 100)}%) for {subject} are trafficking / exploitation-of-persons cases."
+    if hits == 0:
+        return f"No women-safety flag: none of the linked FIRs for {subject} are trafficking-type cases."
+    return f"No women-safety flag: only {hits} of the linked FIRs ({round(share * 100)}%) for {subject} are trafficking-type cases."
+
+
+def _women_safety_patterns(scope: Optional[str]) -> list[dict]:
+    """Repeat-offender recurrence and co-accused clusters, limited to `scope` for jurisdiction-scoped callers."""
+    cached = _ws_extra_cache.get(scope)
+    if cached and time.monotonic() - cached[0] < _PATTERNS_TTL:
+        return cached[1]
+    relevant = _women_safety_fir_ids()
+    now = datetime.now(timezone.utc).isoformat()
+    scope_clause = "AND f.jurisdiction = $scope" if scope else ""
+    out: list[dict] = []
+    with _neo4j.session() as session:
+        repeat = session.run(
+            f"""
+            MATCH (s:Suspect)-[:LINKED_TO_FIR]->(f:FIR)
+            WHERE true {scope_clause}
+            WITH s, collect(DISTINCT f.id) AS firs
+            WHERE size(firs) >= 3
+            RETURN s.id AS suspect, firs
+            """,
+            scope=scope,
+        )
+        rows = []
+        for r in repeat:
+            flag, hits, share = _women_safety_assessment(r["firs"], relevant)
+            rows.append((flag, len(r["firs"]), r["suspect"], hits, share))
+        # Women-safety-relevant offenders first, then by how often they recur.
+        rows.sort(key=lambda x: (not x[0], -x[1], x[2]))
+        for flag, fir_count, suspect, hits, share in rows[:10]:
+            out.append({
+                "pattern_id": f"repeat-{suspect}",
+                "pattern_type": "repeat_offender_recurrence",
+                "confidence": round(min(0.95, 0.60 + fir_count * 0.05), 2),
+                "description": f"{suspect} appears in {fir_count} FIRs — high repeat-offender risk.",
+                "explanation": f"{suspect} is linked to {fir_count} separate FIRs. " + _women_safety_sentence(flag, hits, share, suspect),
+                "entities": [suspect],
+                "entity_ids": [suspect],
+                "detected_at": now,
+                "status": "new",
+                "source": "graph_recurrence",
+                "women_safety_flag": flag,
+                "women_safety_fir_count": hits,
+                "risk_tier": "HIGH" if fir_count >= 5 else "MEDIUM",
+            })
+
+        pairs = session.run(
+            f"""
+            MATCH (a:Suspect)-[:LINKED_TO_FIR]->(f:FIR)<-[:LINKED_TO_FIR]-(b:Suspect)
+            WHERE a.id < b.id {scope_clause}
+            WITH a.id AS s1, b.id AS s2, collect(DISTINCT f.id) AS shared
+            WHERE size(shared) >= 2
+            RETURN s1, s2, shared
+            ORDER BY size(shared) DESC
+            LIMIT 200
+            """,
+            scope=scope,
+        )
+        crows = []
+        for r in pairs:
+            flag, hits, share = _women_safety_assessment(r["shared"], relevant, WS_MIN_FIRS_CLUSTER)
+            crows.append((flag, len(r["shared"]), r["s1"], r["s2"], hits, share))
+        crows.sort(key=lambda x: (not x[0], -x[1], x[2], x[3]))
+        for flag, shared_cases, s1, s2, hits, share in crows[:10]:
+            out.append({
+                "pattern_id": f"cluster-{s1}-{s2}",
+                "pattern_type": "co_accused_cluster",
+                "confidence": round(min(0.92, 0.70 + shared_cases * 0.06), 2),
+                "description": f"{s1} and {s2} appear together in {shared_cases} cases — possible organized network.",
+                "explanation": f"{s1} and {s2} are both named in the same {shared_cases} FIRs. " + _women_safety_sentence(flag, hits, share, "these shared cases"),
+                "entities": [s1, s2],
+                "entity_ids": [s1, s2],
+                "detected_at": now,
+                "status": "new",
+                "source": "co_accused",
+                "women_safety_flag": flag,
+                "women_safety_fir_count": hits,
+                "risk_tier": "HIGH" if shared_cases >= 4 else "MEDIUM",
+            })
+    _ws_extra_cache[scope] = (time.monotonic(), out)
+    return out
+
+
+@router.get("/patterns")
+async def list_patterns(current_user: dict = Depends(get_current_user)):
+    feedback = _pattern_feedback_map()
+    scope = search_scope(current_user)
+    base = await _base_patterns(feedback)
+    extra = await run_in_threadpool(_women_safety_patterns, scope)
+    rows = base + [{**p, "status": _verdict_to_status(feedback.get(p["pattern_id"]))} for p in extra]
+    log_action(current_user, action="list_patterns", resource="patterns",
+               extra={"jurisdiction_filter": scope, "women_safety_flagged": sum(1 for p in rows if p.get("women_safety_flag"))})
+    return rows
+
 
 
 class PatternFeedbackRequest(BaseModel):
@@ -1139,7 +1319,7 @@ def _compute_summary() -> dict:
         "accounts": labels.get("FinancialAccount", 0),
         "calls": rels.get("CALLED", 0),
         "transactions": rels.get("TRANSACTED_WITH", 0),
-        "sightings": sum(c for t, c in rels.items() if "SIGHT" in t),
+        "sightings": rels.get("SEEN_AT", 0),
     }
 
 
@@ -1178,14 +1358,43 @@ def _pdf_safe(text: str) -> str:
     return folded.encode("latin-1", "replace").decode("latin-1")
 
 
+async def _case_patterns(case: dict, current_user: dict) -> list[dict]:
+    """Detected patterns that involve this case's pinned entities (not every pattern in the system)."""
+    pinned = {e["entity_value"] for e in case["entities"]}
+    if not pinned:
+        return []
+    return [p for p in await list_patterns(current_user) if pinned & set(p["entities"])]
+
+
 @router.post("/reports/export")
-async def export_report(payload: ReportExportRequest, current_user: dict = Depends(get_current_user)):
+async def export_report(
+    payload: ReportExportRequest,
+    format: Literal["pdf", "docx"] = Query(default="pdf", description="Report file format"),
+    current_user: dict = Depends(get_current_user),
+):
     case = _fetch_case_detail(payload.case_id)
     _assert_case_scope(case, current_user)
     if case["is_sensitive"] and not payload.justification:
         raise HTTPException(
             status_code=428,
             detail="This case is marked sensitive. Provide a justification to export it.",
+        )
+    patterns = await _case_patterns(case, current_user) if "Pattern Findings" in payload.sections else []
+
+    if format == "docx":
+        exported_at = datetime.now(timezone.utc)
+        content = build_case_docx(case, payload.sections, patterns, current_user["full_name"], exported_at, payload.justification)
+        log_action(
+            current_user,
+            action="export_report",
+            resource=f"case:{payload.case_id}:argus-report-{payload.case_id}.docx",
+            justification=payload.justification,
+            extra={"format": "docx", "sections": payload.sections},
+        )
+        return Response(
+            content=content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename=argus-report-{payload.case_id}.docx"},
         )
 
     pdf = FPDF()
@@ -1222,12 +1431,11 @@ async def export_report(payload: ReportExportRequest, current_user: dict = Depen
         pdf.set_font("Helvetica", "B", 13)
         pdf.multi_cell(0, 8, _pdf_safe("Pattern Findings"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_font("Helvetica", "", 10)
-        patterns = await list_patterns(current_user)
         if patterns:
             for p in patterns:
-                pdf.multi_cell(0, 6, _pdf_safe(f"- {p['description']} ({round(p['confidence'] * 100)}% confidence)"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.multi_cell(0, 6, _pdf_safe(f"- {p['description']} ({round(p['confidence'] * 100)}% confidence) - AI-derived lead, verify before use"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         else:
-            pdf.multi_cell(0, 6, _pdf_safe("No pattern findings."), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.multi_cell(0, 6, _pdf_safe("No detected patterns involve this case's pinned entities."), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(2)
 
     if "Source Citations" in payload.sections:
@@ -1303,6 +1511,7 @@ async def get_audit_log(
             "occurred_at": r["occurred_at"].isoformat(),
             "record_hash": r["record_hash"],
             "previous_hash": r["previous_hash"],
+            "details": r.get("details"),
         }
         for r in rows
     ]

@@ -28,6 +28,7 @@ from config import (
     REDIS_PORT,
 )
 from db import get_cursor, init_db
+from jurisdictions import jurisdiction_for_station
 
 
 ENTITIES = [
@@ -80,6 +81,7 @@ def seed() -> None:
             }
         )
     for fir in firs:
+        fir.setdefault("jurisdiction", jurisdiction_for_station(fir.get("station")))
         es.index(index="argus-firs", id=fir["fir_id"], document=fir, refresh=True)
 
     cdrs = []
@@ -112,7 +114,7 @@ def seed() -> None:
                 SET s.entity_type = 'organization', s.kyc_status = $kyc_status,
                     s.risk_score = $risk_score, s.registered_address = $address
                 MERGE (f:FIR {id: $fir_id})
-                SET f.country = $country, f.pattern = 'structuring'
+                SET f.country = $country, f.pattern = 'structuring', f.jurisdiction = $jurisdiction
                 MERGE (s)-[:LINKED_TO_FIR]->(f)
                 MERGE (p:Phone {id: $phone})
                 MERGE (s)-[:USES_PHONE]->(p)
@@ -123,6 +125,7 @@ def seed() -> None:
                 address=fir["registered_address"],
                 fir_id=fir["fir_id"],
                 country=fir["country"],
+                jurisdiction=fir["jurisdiction"],
                 phone=fir["phone"],
             )
         for cdr in cdrs:

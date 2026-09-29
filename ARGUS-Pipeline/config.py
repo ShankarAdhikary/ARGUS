@@ -77,6 +77,21 @@ MFA_ISSUER = os.getenv("MFA_ISSUER", "ARGUS")
 # Fernet key used to encrypt TOTP secrets at rest. Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 MFA_ENCRYPTION_KEY = os.getenv("MFA_ENCRYPTION_KEY", "")
 
+# Hindi/Indic NER fallback (off by default: needs the optional requirements-indic.txt and a ~400 MB model download).
+ENABLE_INDIC_NER = os.getenv("ENABLE_INDIC_NER", "false").lower() == "true"
+INDIC_NER_MODEL = os.getenv("INDIC_NER_MODEL", "ai4bharat/IndicNER")
+INDIC_NER_MIN_SCORE = float(os.getenv("INDIC_NER_MIN_SCORE", "0.5"))
+
+# --- Optional Keycloak / OIDC single sign-on ---
+# Leave KEYCLOAK_URL empty (the default) to use ARGUS's own sign-in and JWTs. When it is set, the API instead accepts only
+# access tokens issued by that Keycloak realm (verified against its published signing keys) and turns local sign-in off.
+KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "").rstrip("/")
+KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "argus")
+KEYCLOAK_ISSUER = os.getenv("KEYCLOAK_ISSUER", "")            # defaults to <KEYCLOAK_URL>/realms/<realm>; set if the public issuer differs
+KEYCLOAK_AUDIENCE = os.getenv("KEYCLOAK_AUDIENCE", "argus-api")
+KEYCLOAK_ROLE_CLAIM = os.getenv("KEYCLOAK_ROLE_CLAIM", "realm_access.roles")   # dotted path to the list of role names
+KEYCLOAK_JURISDICTION_CLAIM = os.getenv("KEYCLOAK_JURISDICTION_CLAIM", "jurisdiction")
+
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.getenv("LOGIN_LOCKOUT_SECONDS", "900"))
 MAX_REQUEST_BYTES = int(os.getenv("MAX_REQUEST_BYTES", str(100 * 1024 * 1024)))

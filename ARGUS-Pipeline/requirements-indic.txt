@@ -1,0 +1,5 @@
+# Optional: Hindi / Indic named-entity recognition (ENABLE_INDIC_NER=true).
+# Adds roughly 2-3 GB to the image plus a ~400 MB model download on first use, so it is not part of requirements.txt.
+# Install with:  docker compose build --build-arg INSTALL_INDIC_NER=true api
+transformers>=4.40,<5
+torch>=2.2,<3

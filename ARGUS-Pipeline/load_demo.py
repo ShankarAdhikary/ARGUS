@@ -29,6 +29,8 @@ from pathlib import Path
 from elasticsearch import Elasticsearch, helpers
 from neo4j import GraphDatabase
 
+from jurisdictions import jurisdiction_for_station
+
 from config import (
     ELASTICSEARCH_URL,
     ES_AUTH_KWARGS,
@@ -68,7 +70,7 @@ def load_firs_neo4j(driver: GraphDatabase.driver, firs: list[dict]) -> None:
                 MERGE (s:Suspect {id: $suspect_id})
                 MERGE (f:FIR {id: $fir_id})
                 MERGE (s)-[link:LINKED_TO_FIR]->(f)
-                SET f.date = $date, link.date = $date, link.source_record_id = $fir_id
+                SET f.date = $date, f.jurisdiction = $jurisdiction, link.date = $date, link.source_record_id = $fir_id
                 FOREACH (_ IN CASE WHEN $mobile <> '' THEN [1] ELSE [] END |
                     MERGE (p:Phone {id: $mobile})
                     MERGE (s)-[:USES_PHONE]->(p)
@@ -78,6 +80,7 @@ def load_firs_neo4j(driver: GraphDatabase.driver, firs: list[dict]) -> None:
                 fir_id=record.get("fir_id"),
                 mobile=mobile,
                 date=record.get("date"),
+                jurisdiction=record.get("jurisdiction") or jurisdiction_for_station(record.get("station")),
             )
 
 
@@ -159,7 +162,7 @@ def load_firs_es(es: Elasticsearch, firs: list[dict]) -> None:
         {
             "_index": "argus-firs",
             "_id": record.get("fir_id"),
-            "_source": record,
+            "_source": {**record, "jurisdiction": record.get("jurisdiction") or jurisdiction_for_station(record.get("station"))},
         }
         for record in firs
     ]

@@ -11,6 +11,7 @@ import psycopg2.extras
 from psycopg2.pool import SimpleConnectionPool
 
 from auth_security import hash_password
+from request_context import CROSS_JURISDICTION_ROLES, get_request_user
 from config import (
     POSTGRES_DB,
     POSTGRES_HOST,
@@ -20,6 +21,9 @@ from config import (
 )
 
 _pool: SimpleConnectionPool | None = None
+# Set once init_db has created the restricted role and policies; until then requests run without the role switch.
+_rls_ready = False
+RLS_ROLE = "argus_rls"
 
 
 def get_pool() -> SimpleConnectionPool:
@@ -39,14 +43,30 @@ def get_pool() -> SimpleConnectionPool:
 
 @contextmanager
 def get_cursor(commit: bool = False):
-    """Yields a RealDictCursor from a pooled connection, returning it on exit."""
+    """Yields a RealDictCursor from a pooled connection, returning it on exit.
+
+    Every call ends its transaction (commit or rollback) so nothing is left open on a pooled connection.
+    For an authenticated request, the transaction runs as the restricted `argus_rls` role with the caller's
+    role and jurisdiction set, so the row-level-security policies decide which cases are visible. Work with no
+    request behind it (start-up, login, the ingest worker) runs as the trusted service user.
+    """
     pool = get_pool()
     conn = pool.getconn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            caller = get_request_user()
+            if caller is not None and _rls_ready:
+                # LOCAL settings vanish at commit/rollback, so they cannot leak to the next request on this connection.
+                cur.execute(f"SET LOCAL ROLE {RLS_ROLE}")
+                cur.execute(
+                    "SELECT set_config('app.role', %s, true), set_config('app.jurisdiction', %s, true)",
+                    (caller["role"], caller["jurisdiction"]),
+                )
             yield cur
         if commit:
             conn.commit()
+        else:
+            conn.rollback()
     except Exception:
         conn.rollback()
         raise
@@ -117,14 +137,16 @@ ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS previous_hash TEXT;
 ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS record_hash TEXT;
 CREATE INDEX IF NOT EXISTS audit_log_occurred_at_idx ON audit_log (occurred_at);
 
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS details JSONB;
+
 -- Audit log is append-only: the only permitted UPDATE fills a NULL record_hash.
 CREATE OR REPLACE FUNCTION audit_log_guard() RETURNS trigger AS $$
 BEGIN
     IF TG_OP = 'UPDATE'
        AND OLD.record_hash IS NULL AND NEW.record_hash IS NOT NULL
-       AND (OLD.audit_id, OLD.user_full_name, OLD.role, OLD.action, OLD.resource, OLD.justification, OLD.occurred_at, OLD.previous_hash)
+       AND (OLD.audit_id, OLD.user_full_name, OLD.role, OLD.action, OLD.resource, OLD.justification, OLD.occurred_at, OLD.previous_hash, OLD.details)
            IS NOT DISTINCT FROM
-           (NEW.audit_id, NEW.user_full_name, NEW.role, NEW.action, NEW.resource, NEW.justification, NEW.occurred_at, NEW.previous_hash)
+           (NEW.audit_id, NEW.user_full_name, NEW.role, NEW.action, NEW.resource, NEW.justification, NEW.occurred_at, NEW.previous_hash, NEW.details)
     THEN
         RETURN NEW;
     END IF;
@@ -183,6 +205,46 @@ DEMO_USERS = [
 ]
 
 
+def _rls_sql() -> str:
+    roles = ", ".join(f"'{r}'" for r in CROSS_JURISDICTION_ROLES)
+    caller_may_see = f"(jurisdiction = current_setting('app.jurisdiction', true) OR current_setting('app.role', true) IN ({roles}))"
+    child = "EXISTS (SELECT 1 FROM cases c WHERE c.case_id = {table}.case_id)"  # inherits the cases policy
+    return f"""
+SELECT pg_advisory_xact_lock(724002);  -- API workers start together; apply the policies one at a time
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{RLS_ROLE}') THEN
+        CREATE ROLE {RLS_ROLE} NOLOGIN NOINHERIT;
+    END IF;
+END $$;
+-- The service user may switch into the restricted role (a superuser can already; this covers ordinary owners).
+GRANT {RLS_ROLE} TO CURRENT_USER;
+GRANT USAGE ON SCHEMA public TO {RLS_ROLE};
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {RLS_ROLE};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {RLS_ROLE};
+-- Tables with auto-numbered ids (e.g. case_entity_links) insert through a sequence.
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {RLS_ROLE};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO {RLS_ROLE};
+REVOKE DELETE, TRUNCATE ON audit_log FROM {RLS_ROLE};
+
+-- Fail closed: with no app.role / app.jurisdiction set, current_setting(..., true) is NULL and no row matches.
+ALTER TABLE cases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cases FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS cases_jurisdiction ON cases;
+CREATE POLICY cases_jurisdiction ON cases USING {caller_may_see} WITH CHECK {caller_may_see};
+
+ALTER TABLE case_entity_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE case_entity_links FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS case_entity_links_scope ON case_entity_links;
+CREATE POLICY case_entity_links_scope ON case_entity_links USING ({child.format(table='case_entity_links')}) WITH CHECK ({child.format(table='case_entity_links')});
+
+ALTER TABLE case_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE case_notes FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS case_notes_scope ON case_notes;
+CREATE POLICY case_notes_scope ON case_notes USING ({child.format(table='case_notes')}) WITH CHECK ({child.format(table='case_notes')});
+"""
+
+
 def init_db() -> None:
     """Creates the platform schema and optionally seeds demo users.
 
@@ -190,10 +252,14 @@ def init_db() -> None:
     is explicitly set to "true". This prevents demo credentials from being
     created in production deployments that do not set the flag.
     """
+    global _rls_ready
     _seed_demos = os.getenv("SEED_DEMO_USERS", "false").lower() == "true"
     with get_cursor(commit=True) as cur:
         cur.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
         cur.execute(SCHEMA)
+        if os.getenv("ENABLE_DB_RLS", "true").lower() == "true":
+            cur.execute(_rls_sql())
+            _rls_ready = True
         if _seed_demos:
             for employee_id, password, full_name, role, jurisdiction in DEMO_USERS:
                 cur.execute("SELECT 1 FROM users WHERE employee_id = %s", (employee_id,))

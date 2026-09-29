@@ -1,7 +1,10 @@
 services:
   api:
-    build: .
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+    build:
+      context: .
+      args:
+        INSTALL_INDIC_NER: ${INSTALL_INDIC_NER:-false}
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2 --timeout-keep-alive 65
     restart: unless-stopped
     environment:
       MINIO_ENDPOINT: minio:9000
@@ -28,6 +31,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-argus_db}
       JWT_SECRET: ${JWT_SECRET:?set in .env}
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      ENABLE_INDIC_NER: ${ENABLE_INDIC_NER:-false}
       # Match TensorFlow/BLAS threads to the CPU quota; the host reports 12 cores, so the default over-subscribes and throttles ~4x.
       OMP_NUM_THREADS: "4"
       TF_NUM_INTRAOP_THREADS: "4"

@@ -46,7 +46,8 @@ from config import (
 from text_extraction import extract_candidates
 from db import init_db
 from face_index import FaceIndex
-from platform_api import router as platform_router, check_and_fire_alerts, log_action, burner_cutoff
+from jurisdictions import UNASSIGNED, jurisdiction_for_station
+from platform_api import router as platform_router, check_and_fire_alerts, log_action, burner_cutoff, search_scope
 from auth_security import get_current_user, require_role
 from platform_api import enforce_case_access
 
@@ -374,19 +375,22 @@ async def ingest_text(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_safe_detail(exc)) from exc
 
+def _scoped(query: dict, scope: str | None) -> dict:
+    """Restrict an Elasticsearch query to one jurisdiction (None = no restriction)."""
+    if scope is None:
+        return query
+    return {"bool": {"must": [query], "filter": [{"term": {"jurisdiction.keyword": scope}}]}}
+
+
 @app.get("/api/v1/search/firs")
 async def search_firs(q: str, current_user: dict = Depends(get_current_user)):
     try:
-        response = es_client.search(
-            index="argus-firs",
-            query={
-                "multi_match": {
-                    "query": q,
-                    "fields": ["station", "complainant", "accused", "description"],
-                }
-            },
-        )
+        scope = search_scope(current_user)
+        text_query = {"multi_match": {"query": q, "fields": ["station", "complainant", "accused", "description"]}}
+        response = es_client.search(index="argus-firs", query=_scoped(text_query, scope))
         hits = [hit["_source"] for hit in response["hits"]["hits"]]
+        log_action(current_user, action="search_firs", resource=f"search:{q[:80]}",
+                   extra={"jurisdiction_filter": scope, "results": len(hits)})
         return {"status": "success", "query": q, "count": len(hits), "results": hits}
     except Exception as e:
         raise HTTPException(status_code=503, detail=_safe_detail(e)) from e
@@ -399,9 +403,10 @@ async def get_judge_targets(prison: str = "All", current_user: dict = Depends(ge
         else:
             query = {"match": {"prison_facility": prison}}
 
+        scope = search_scope(current_user)
         response = es_client.search(
             index="argus-firs",
-            query=query,
+            query=_scoped(query, scope),
             size=50
         )
         
@@ -410,7 +415,9 @@ async def get_judge_targets(prison: str = "All", current_user: dict = Depends(ge
         for hit in hits:
             if "aadhaar" in hit:
                 hit["aadhaar"] = "[Aadhaar Redacted]"
-            
+
+        log_action(current_user, action="search_judges_view", resource=f"prison:{prison[:80]}",
+                   extra={"jurisdiction_filter": scope, "results": len(hits)})
         return {"status": "success", "count": len(hits), "results": hits}
     except Exception as e:
         raise HTTPException(status_code=503, detail=_safe_detail(e)) from e
@@ -426,10 +433,11 @@ async def get_accused_network(
 ):
     try:
         enforce_case_access(case_id, justification, current_user)
+        scope = search_scope(current_user)
         fir_query = """
         MATCH (s:Suspect {id: $name})-[:LINKED_TO_FIR]->(f:FIR)
         WHERE $before IS NULL OR f.date <= $before
-        RETURN s.id AS accused, collect(f.id) AS firs
+        RETURN s.id AS accused, collect({id: f.id, jurisdiction: f.jurisdiction}) AS firs
         """
         # The suspect's own handsets and who those handsets call. Without this
         # the person view is only a star of FIRs, with no path into the call
@@ -448,6 +456,20 @@ async def get_accused_network(
         """
         with neo4j_driver.session() as session:
             record = session.run(fir_query, name=accused_name, before=before).single()
+            all_firs = record["firs"] if record else []
+
+            if scope is not None:
+                # A scoped officer only sees a person through FIRs in their own jurisdiction. Someone who exists
+                # only elsewhere gets the same answer as someone who does not exist, so this can't be used to
+                # probe what lies outside the officer's scope (and no 403 that would confirm it).
+                firs = [f["id"] for f in all_firs if f["jurisdiction"] == scope]
+                if not firs:
+                    log_action(current_user, action="view_accused_network", resource=f"accused:{accused_name[:80]}",
+                               extra={"jurisdiction_filter": scope, "in_scope_firs": 0})
+                    return {"status": "success", "message": "No results in your jurisdiction."}
+            else:
+                firs = [f["id"] for f in all_firs]
+
             phones = session.run(phone_query, name=accused_name).single()
             phones = phones["phones"] if phones else []
             contacts = [
@@ -455,7 +477,8 @@ async def get_accused_network(
                 for r in session.run(contact_query, name=accused_name, limit=contact_limit, before=before)
             ]
 
-            firs = record["firs"] if record else []
+            log_action(current_user, action="view_accused_network", resource=f"accused:{accused_name[:80]}",
+                       extra={"jurisdiction_filter": scope, "in_scope_firs": len(firs)})
             if firs or phones:
                 return {
                     "status": "success",
@@ -630,21 +653,23 @@ async def detect_burner_phones(threshold: Optional[int] = None, current_user: di
 @app.get("/api/v1/search/master-dossier")
 async def get_master_dossier(query: str, current_user: dict = Depends(get_current_user)):
     try:
-        es_response = es_client.search(
-            index="argus-firs",
-            query={
-                "bool": {
-                    "should": [
-                        {"term": {"fir_id.keyword": query}},
-                        {"term": {"accused.keyword": query}},
-                        {"match": {"fir_id": query}}
-                    ],
-                    "minimum_should_match": 1
-                }
-            },
-            size=1
-        )
+        scope = search_scope(current_user)
+        dossier_query = {
+            "bool": {
+                "should": [
+                    {"term": {"fir_id.keyword": query}},
+                    {"term": {"accused.keyword": query}},
+                    {"match": {"fir_id": query}}
+                ],
+                "minimum_should_match": 1
+            }
+        }
+        if scope is not None:
+            dossier_query["bool"]["filter"] = [{"term": {"jurisdiction.keyword": scope}}]
+        es_response = es_client.search(index="argus-firs", query=dossier_query, size=1)
         es_hits = [hit["_source"] for hit in es_response["hits"]["hits"]]
+        log_action(current_user, action="view_dossier", resource=f"dossier:{query[:80]}",
+                   extra={"jurisdiction_filter": scope, "results": len(es_hits)})
 
         for hit in es_hits:
             if "aadhaar" in hit:
@@ -886,6 +911,9 @@ async def unified_enroll(
             "prison_facility": prison,
             "date": "2026-09-08",
             "station": "ARGUS Command",
+            # The enrolling officer's own jurisdiction; unscoped roles (admin...) leave it Unassigned so it is not
+            # attributed to a district by accident.
+            "jurisdiction": current_user["jurisdiction"] if search_scope(current_user) else UNASSIGNED,
             "description": f"Target manually enrolled. History: {history}",
             "Image": image_url 
         }
@@ -896,10 +924,12 @@ async def unified_enroll(
                 """
                 MERGE (s:Suspect {id: $suspect_id})
                 MERGE (f:FIR {id: $fir_id})
+                SET f.jurisdiction = $jurisdiction
                 MERGE (s)-[:LINKED_TO_FIR]->(f)
                 """,
                 suspect_id=accused,
                 fir_id=fir_id,
+                jurisdiction=record["jurisdiction"],
             )
 
         return {"status": "success", "message": "Unified profile created successfully across all grids!"}
