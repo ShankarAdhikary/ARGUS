@@ -1,0 +1,20 @@
+[
+  {
+    "event_id": "CAM-001",
+    "camera_id": "CAM-BUS-07",
+    "zone": "Central Bus Terminal",
+    "timestamp": "2026-09-09T10:30:00",
+    "suspect_name": "Vikram Singh",
+    "match_confidence": 0.87,
+    "source_type": "surveillance"
+  },
+  {
+    "event_id": "CAM-002",
+    "camera_id": "CAM-MARKET-02",
+    "zone": "East Market",
+    "timestamp": "2026-09-09T10:52:00",
+    "suspect_name": "Vikram Singh",
+    "match_confidence": 0.84,
+    "source_type": "surveillance"
+  }
+]

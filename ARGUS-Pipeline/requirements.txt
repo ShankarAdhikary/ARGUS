@@ -1,0 +1,22 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+python-multipart>=0.0.9
+redis>=5,<7
+elasticsearch>=8.10,<9
+minio>=7.2,<8
+neo4j>=5.0,<7
+pydantic>=2.0,<3
+numpy>=1.26,<3
+faiss-cpu>=1.8
+opencv-python-headless>=4.10
+deepface>=0.0.93
+# deepface's retinaface backend refuses to import under Keras 3 (TF >= 2.16)
+# unless the legacy tf-keras shim is installed.
+tf-keras>=2.16
+networkx>=3.4,<4
+psycopg2-binary>=2.9,<3
+PyJWT>=2.8,<3
+rapidfuzz>=3.9,<4
+fpdf2>=2.7,<3
+scipy>=1.14,<2
+cryptography>=42,<46

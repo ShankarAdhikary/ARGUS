@@ -1,0 +1,10 @@
+# Root-level convenience wrapper.
+# Run `docker compose up -d` from the repo root (ARGUS/) — this delegates
+# everything to ARGUS-Pipeline/docker-compose.yml.
+#
+# The .env file must exist at ARGUS-Pipeline/.env (already present).
+# All service definitions, volumes, and build contexts live there.
+
+include:
+  - path: ARGUS-Pipeline/docker-compose.yml
+    env_file: ARGUS-Pipeline/.env

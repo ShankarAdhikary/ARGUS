@@ -1,0 +1,7 @@
+[
+  {"call_id": "CALL-001", "caller": "9999988888", "receiver": "9000011111", "timestamp": "2026-09-09T09:00:00", "duration_sec": 180},
+  {"call_id": "CALL-002", "caller": "9000011111", "receiver": "9888877777", "timestamp": "2026-09-09T09:08:00", "duration_sec": 240},
+  {"call_id": "CALL-003", "caller": "9888877777", "receiver": "9000022222", "timestamp": "2026-09-09T09:15:00", "duration_sec": 120},
+  {"call_id": "CALL-004", "caller": "9999988888", "receiver": "9000011111", "timestamp": "2026-09-09T11:00:00", "duration_sec": 150},
+  {"call_id": "CALL-005", "caller": "9000011111", "receiver": "9888877777", "timestamp": "2026-09-09T11:04:00", "duration_sec": 210}
+]

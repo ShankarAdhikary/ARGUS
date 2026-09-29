@@ -1,0 +1,229 @@
+services:
+  api:
+    build: .
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+    restart: unless-stopped
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set in .env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set in .env}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set in .env}
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_USER: elastic
+      ELASTICSEARCH_PASSWORD: ${ELASTIC_PASSWORD:?set in .env}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?set in .env}
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-lite-latest}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-argus_db}
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      # Match TensorFlow/BLAS threads to the CPU quota; the host reports 12 cores, so the default over-subscribes and throttles ~4x.
+      OMP_NUM_THREADS: "4"
+      TF_NUM_INTRAOP_THREADS: "4"
+      TF_NUM_INTEROP_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "4"
+      MFA_REQUIRED_ROLES: ${MFA_REQUIRED_ROLES:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
+      ARGUS_ENV: ${ARGUS_ENV:-development}
+      SEED_DEMO_USERS: ${SEED_DEMO_USERS:-true}
+    volumes:
+      - ./uploads:/app/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 2500m
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    build: .
+    command: python worker.py
+    restart: unless-stopped
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set in .env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set in .env}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set in .env}
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_USER: elastic
+      ELASTICSEARCH_PASSWORD: ${ELASTIC_PASSWORD:?set in .env}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?set in .env}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-argus_db}
+      ARGUS_ENV: ${ARGUS_ENV:-development}
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1500m
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-argus_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No host port — reachable only on the internal compose network
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-argus_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512m
+
+  neo4j:
+    image: neo4j:latest
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?set in .env}
+    volumes:
+      - neo4j_data:/data
+    # Browser only: expose internally; bolt reachable on internal network
+    expose:
+      - "7474"
+      - "7687"
+    ports:
+      - "7474:7474"   # Neo4j browser — remove in production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 16
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1g
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:?set in .env}
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    # No host port: ES is reachable only on the internal compose network
+    expose:
+      - "9200"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fs -u "elastic:$$ELASTIC_PASSWORD" http://localhost:9200/_cluster/health || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1500m
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?set in .env}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9001:9001"   # Console UI only — remove in production
+    expose:
+      - "9000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512m
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:?set in .env} --save 60 1 --loglevel warning
+    expose:
+      - "6379"
+    # No host port — Redis is internal only
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?set in .env}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+
+volumes:
+  postgres_data:
+  neo4j_data:
+  es_data:
+  minio_data:

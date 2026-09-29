@@ -1,0 +1,2 @@
+FIR-2026-001 states that Suspect Vikram Singh used mobile 9999988888 near Central Bus Terminal.
+The record notes a call to 9000011111 before a meeting at the terminal. This is synthetic hackathon data only.

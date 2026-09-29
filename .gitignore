@@ -1,0 +1,21 @@
+# secrets & local config
+.env
+.env.*
+!.env.example
+
+# dependencies / build output
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.tsbuildinfo
+ARGUS-Frontend/vite.config.js
+ARGUS-Frontend/vite.config.d.ts
+
+# runtime data (uploaded photos, face index, audit-log backups)
+uploads/
+backups/
+
+.DS_Store

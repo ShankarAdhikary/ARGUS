@@ -1,0 +1,402 @@
+[
+    {
+        "fir_id": "903378ea-e7a4-4da6-b5a1-0566c585e1e4",
+        "date": "2026-01-18",
+        "station": "Aizawl Police Station",
+        "complainant": "Aachal Tiwari",
+        "accused": "Anjali Bhasin",
+        "description": "Officia id blanditiis perspiciatis at quasi. Repellendus aliquam ex qui culpa."
+    },
+    {
+        "fir_id": "77f23f2b-ee3c-468d-8ff9-9bd8cc7d5ca9",
+        "date": "2026-01-30",
+        "station": "Raipur Police Station",
+        "complainant": "Manya Shukla",
+        "accused": "Anay Dash",
+        "description": "Consectetur quasi optio repudiandae animi in doloremque. Neque aliquam provident commodi aliquid cum libero. Perferendis velit ducimus."
+    },
+    {
+        "fir_id": "a7133ed6-a47b-467c-9ee3-775a56a0272d",
+        "date": "2026-04-10",
+        "station": "Silchar Police Station",
+        "complainant": "Luke Desai",
+        "accused": "Chanakya Agarwal",
+        "description": "Iure consectetur asperiores officiis atque voluptate totam. Accusamus rerum tempora.\nCumque unde mollitia culpa occaecati dignissimos. Voluptas animi itaque expedita. Ad vero ex ut dicta officia."
+    },
+    {
+        "fir_id": "833d104e-9c9e-44fe-8ba3-f598c06d74e3",
+        "date": "2026-03-01",
+        "station": "Begusarai Police Station",
+        "complainant": "Warjas Goda",
+        "accused": "Darsh Choudhury",
+        "description": "Qui temporibus a et asperiores. Molestiae enim esse cupiditate unde. Molestias totam ad dicta incidunt odio facilis."
+    },
+    {
+        "fir_id": "5c77e849-f5b8-47f0-93d2-fc32043c8d02",
+        "date": "2026-07-29",
+        "station": "Haridwar Police Station",
+        "complainant": "Ekavir Seth",
+        "accused": "Ojasvi Raman",
+        "description": "Neque quae ducimus deleniti debitis. Nisi et tempora porro. Inventore voluptas vel tempora alias.\nBeatae possimus esse qui eos placeat ipsum quasi. Iure vero possimus cupiditate adipisci."
+    },
+    {
+        "fir_id": "c348addd-0b08-4171-93ef-60e8bed217b7",
+        "date": "2026-06-04",
+        "station": "Loni Police Station",
+        "complainant": "Nandini Tata",
+        "accused": "Jackson Krishnan",
+        "description": "Ad sit tenetur ipsum voluptatibus doloremque maiores suscipit. Iure eius ratione ad. Officiis fuga et.\nVelit veniam laudantium necessitatibus consequatur. Deleniti ipsa architecto est error quos."
+    },
+    {
+        "fir_id": "e1907e49-0e6c-439d-b3ac-48c3c3d559f8",
+        "date": "2026-03-30",
+        "station": "Kottayam Police Station",
+        "complainant": "Zaid Korpal",
+        "accused": "Fiyaz Naidu",
+        "description": "Temporibus aut numquam magni dolore laboriosam exercitationem placeat. Inventore mollitia amet dolore."
+    },
+    {
+        "fir_id": "6658779a-cdce-4177-907b-1c2e60c7d3e7",
+        "date": "2026-08-08",
+        "station": "Bhiwandi Police Station",
+        "complainant": "Jason Mane",
+        "accused": "Ridhi Gara",
+        "description": "Illum repellendus totam. Illum porro assumenda odio cumque iste. Illum molestias esse beatae cum commodi."
+    },
+    {
+        "fir_id": "9b17323c-9156-40f2-8d0a-a42d230e9ce9",
+        "date": "2026-04-30",
+        "station": "Vijayanagaram Police Station",
+        "complainant": "Raagini Pillay",
+        "accused": "Aarna Kuruvilla",
+        "description": "Minima porro ad. Nulla consequuntur modi illo accusamus aliquam debitis voluptatum.\nPlaceat commodi numquam quos. Vel assumenda repellendus earum magnam. Sit sunt eius odio aut officiis aspernatur."
+    },
+    {
+        "fir_id": "680d9c83-2123-4468-9994-357113b2210f",
+        "date": "2026-04-08",
+        "station": "Thiruvananthapuram Police Station",
+        "complainant": "Nicholas Ratta",
+        "accused": "Dayita Iyer",
+        "description": "Maxime quia reprehenderit perspiciatis."
+    },
+    {
+        "fir_id": "55e44065-126b-45fe-92ce-10a6c2c36693",
+        "date": "2026-05-30",
+        "station": "Siwan Police Station",
+        "complainant": "Darpan Bera",
+        "accused": "Nirja Rajagopalan",
+        "description": "Nihil quasi consequatur veniam alias dolorum. Dignissimos ipsum nemo recusandae laboriosam delectus delectus."
+    },
+    {
+        "fir_id": "68054bb8-06f0-4799-aafb-09d4ddf30178",
+        "date": "2026-04-28",
+        "station": "Ichalkaranji Police Station",
+        "complainant": "Aarav Ramakrishnan",
+        "accused": "Harsh Mittal",
+        "description": "Ratione consequatur optio enim. Dignissimos id atque officia.\nMollitia repudiandae tempore temporibus non. Commodi asperiores odit voluptas ab."
+    },
+    {
+        "fir_id": "28bc1ed0-5b92-46dc-b4e2-33bab152c2c8",
+        "date": "2026-05-19",
+        "station": "Nashik Police Station",
+        "complainant": "Leela Borra",
+        "accused": "Victor Dass",
+        "description": "Sed voluptatem aspernatur eaque alias aliquid. Aspernatur hic esse. Magnam eos labore illo laudantium."
+    },
+    {
+        "fir_id": "38a8e61e-d3e3-422a-9ca8-83fcf91dd5d0",
+        "date": "2026-05-12",
+        "station": "Haridwar Police Station",
+        "complainant": "Nisha Narain",
+        "accused": "Saumya Dugar",
+        "description": "Iure quod ipsa enim sunt dignissimos corporis. Mollitia ullam non provident cumque dolorem reprehenderit.\nIste officiis vitae."
+    },
+    {
+        "fir_id": "2d1a7fc2-a0a3-4625-8867-76b9f0134be2",
+        "date": "2026-05-14",
+        "station": "Bathinda Police Station",
+        "complainant": "Vrishti Zacharia",
+        "accused": "Ansh Mangat",
+        "description": "Odio facilis cumque rerum beatae dolorum explicabo corrupti. Voluptatem magni debitis ex quis.\nDelectus at ad fugit. Voluptas dolorum id. Vel aliquam esse ipsam temporibus."
+    },
+    {
+        "fir_id": "d90cea86-8fce-4fa5-8508-aba07a39c035",
+        "date": "2026-01-17",
+        "station": "Deoghar Police Station",
+        "complainant": "Sneha Arya",
+        "accused": "Siya Golla",
+        "description": "Magni corporis placeat rem autem consequuntur nesciunt. A aut ipsa fugit illum distinctio recusandae."
+    },
+    {
+        "fir_id": "5e04a842-5b52-4fc7-ab90-b0ecb06e0cf8",
+        "date": "2026-05-31",
+        "station": "North Dumdum Police Station",
+        "complainant": "Radhika Gaba",
+        "accused": "Pranav Kota",
+        "description": "Est iure eius maxime accusamus. Sint maxime iure cumque voluptas ipsam. Dolorum excepturi quia autem ad ipsum architecto quos."
+    },
+    {
+        "fir_id": "4bd802c1-ea34-4199-8ee3-cc44c00416ba",
+        "date": "2026-01-31",
+        "station": "Udupi Police Station",
+        "complainant": "Netra Sood",
+        "accused": "David Naik",
+        "description": "Necessitatibus voluptatem voluptates ipsum enim asperiores deleniti. Sed quisquam veritatis esse.\nConsequuntur quas atque autem."
+    },
+    {
+        "fir_id": "4ac42027-f122-445b-bc13-d64ddfc62e4f",
+        "date": "2026-01-03",
+        "station": "Ludhiana Police Station",
+        "complainant": "Kashvi Master",
+        "accused": "Vidhi Sampath",
+        "description": "Illo eos rem sunt. Id dolores ab eveniet quam ratione voluptates. Eveniet sit consectetur perferendis iusto repellendus eos aspernatur."
+    },
+    {
+        "fir_id": "4dc5a7f8-62a4-4cd8-8a53-e1d980abf18e",
+        "date": "2026-07-09",
+        "station": "Kakinada Police Station",
+        "complainant": "Kabir Malhotra",
+        "accused": "Azad Sharma",
+        "description": "Natus totam cum labore quaerat magnam illum. Consectetur alias minus saepe ipsum maiores maxime.\nDolorem alias ratione sint voluptatibus quidem cum eos. Ratione quisquam voluptates beatae."
+    },
+    {
+        "fir_id": "e1a91137-4e22-4a11-b553-5b4ef3357d95",
+        "date": "2026-06-27",
+        "station": "Naihati Police Station",
+        "complainant": "Wyatt Sem",
+        "accused": "Lopa Bala",
+        "description": "Beatae aspernatur nulla labore. Hic aut velit odit."
+    },
+    {
+        "fir_id": "d9deb614-ab9b-4bec-99f5-71bf9b34b297",
+        "date": "2026-04-27",
+        "station": "Ambala Police Station",
+        "complainant": "Joshua Parmar",
+        "accused": "Frederick Bal",
+        "description": "Optio dolores maxime quidem commodi odit. Necessitatibus explicabo deleniti sed porro necessitatibus.\nDucimus libero ratione labore. Reprehenderit sint quidem ex ducimus."
+    },
+    {
+        "fir_id": "1d433146-e7dd-4fdc-9fc3-6970098f7248",
+        "date": "2026-08-26",
+        "station": "New Delhi Police Station",
+        "complainant": "Pranav Khare",
+        "accused": "Dayamai Apte",
+        "description": "Fuga ratione velit dolorum. Ipsa necessitatibus voluptatibus autem perferendis voluptatem. Reiciendis quae numquam suscipit numquam."
+    },
+    {
+        "fir_id": "7ca4e748-4b73-46a9-b56c-4f808fd4c6d8",
+        "date": "2026-01-10",
+        "station": "Muzaffarnagar Police Station",
+        "complainant": "Ijaya Chaudry",
+        "accused": "Nihal Hayre",
+        "description": "Vel quaerat nemo pariatur error ea voluptates. Quis quae aperiam. Distinctio quae unde qui. Rem quis nam molestiae quasi.\nTempora quos consequuntur cupiditate. Repellat a dolore."
+    },
+    {
+        "fir_id": "1dd2804c-76be-4188-865f-5ed289db2ac3",
+        "date": "2026-04-21",
+        "station": "Berhampur Police Station",
+        "complainant": "Kamala Chaudhry",
+        "accused": "Ekantika Rana",
+        "description": "Atque mollitia quas blanditiis quibusdam. Veritatis dolore voluptatum possimus nobis.\nMinima natus nisi quae voluptas. Voluptates cumque cumque laboriosam blanditiis consequuntur sint delectus."
+    },
+    {
+        "fir_id": "08d0bcf0-20ad-4aab-91af-5c492b90325d",
+        "date": "2026-04-23",
+        "station": "Belgaum Police Station",
+        "complainant": "Riya Sekhon",
+        "accused": "Sai Butala",
+        "description": "Non nihil saepe nemo amet fugit.\nPossimus ad facere.\nError aliquam culpa assumenda delectus. Natus molestias quod. Ipsum cupiditate voluptas odio voluptas hic."
+    },
+    {
+        "fir_id": "f0d49614-17ab-4c4a-999d-09933540dca1",
+        "date": "2026-03-14",
+        "station": "Jodhpur Police Station",
+        "complainant": "Panini Gala",
+        "accused": "Rudra Chawla",
+        "description": "Veniam laborum non vitae provident quod delectus. Natus perferendis consequatur veniam quisquam. Magni nostrum ipsa similique sequi quos.\nCumque consequatur impedit atque soluta molestias."
+    },
+    {
+        "fir_id": "114457be-01a9-49e4-ad2c-d213f13428aa",
+        "date": "2026-02-19",
+        "station": "Bhilai Police Station",
+        "complainant": "Ishita Sharaf",
+        "accused": "Urishilla Varghese",
+        "description": "Iure blanditiis officiis quod consectetur assumenda. Facilis suscipit repudiandae laboriosam vitae.\nDeleniti facere enim ratione."
+    },
+    {
+        "fir_id": "ca53958f-5071-4bbc-b862-c52b4ebd9ed9",
+        "date": "2026-08-29",
+        "station": "Navi Mumbai Police Station",
+        "complainant": "Bhavini Prabhu",
+        "accused": "Mason Bhagat",
+        "description": "Ipsa unde hic nihil repellat corrupti sequi illo.\nDolore debitis sapiente labore eum et non. Sit numquam expedita cum omnis cum iusto. Saepe soluta ut aliquam eligendi odio debitis."
+    },
+    {
+        "fir_id": "b4b6bf8b-5520-4316-bdd1-dfe822684a3e",
+        "date": "2026-01-07",
+        "station": "Gwalior Police Station",
+        "complainant": "Krisha Chowdhury",
+        "accused": "Falan Ganesh",
+        "description": "Iusto tempora neque commodi accusantium. Tenetur dolore illum recusandae dicta placeat ut."
+    },
+    {
+        "fir_id": "6bbde4fc-f99d-499c-b020-13e667b6ee0e",
+        "date": "2026-08-26",
+        "station": "Nashik Police Station",
+        "complainant": "Abha Anand",
+        "accused": "Vrishti Bahri",
+        "description": "Eum modi provident animi. Voluptates totam aut maiores. Provident eum quos error accusantium incidunt vel a."
+    },
+    {
+        "fir_id": "4390eed4-4eff-4188-ab2d-95c79d35d5c7",
+        "date": "2026-03-31",
+        "station": "Bulandshahr Police Station",
+        "complainant": "Ishwar Naidu",
+        "accused": "Jeet Vaidya",
+        "description": "Minima mollitia maxime quaerat incidunt vero eaque. Saepe ipsam nihil debitis mollitia modi. Quae atque modi quod aliquam."
+    },
+    {
+        "fir_id": "31d091fe-b880-4c18-a56d-82421a50d176",
+        "date": "2026-06-03",
+        "station": "Mango Police Station",
+        "complainant": "Ayushman Rama",
+        "accused": "Ayushman Parmar",
+        "description": "Placeat odit quos quam soluta ex dolore. Tempore harum commodi sint. Excepturi nobis a ipsam dolorem illo odit."
+    },
+    {
+        "fir_id": "68a36b66-14c4-41ef-8d3d-4ce4ba974e0e",
+        "date": "2026-02-26",
+        "station": "Narasaraopet Police Station",
+        "complainant": "Tanveer Dasgupta",
+        "accused": "Avi Rastogi",
+        "description": "Similique facere error similique ducimus ipsam enim. Ab itaque quae at occaecati quidem non voluptate."
+    },
+    {
+        "fir_id": "957b88b9-bbeb-4814-9470-7ca4675857c8",
+        "date": "2026-08-22",
+        "station": "Hubli\u2013Dharwad Police Station",
+        "complainant": "Michael Patla",
+        "accused": "Vritti Dutta",
+        "description": "Sit temporibus ex qui modi nisi. Nemo ea sapiente.\nMinima ducimus veritatis modi alias. Dolorem corporis debitis deleniti. Ipsa sit incidunt optio."
+    },
+    {
+        "fir_id": "50c6b5e6-25b3-4188-b891-486d23c27a7e",
+        "date": "2026-05-12",
+        "station": "Agartala Police Station",
+        "complainant": "Ranveer Vyas",
+        "accused": "Azaan Vig",
+        "description": "Dolore ipsa suscipit excepturi quasi error odit ex. Nisi tenetur earum.\nPerferendis consequuntur vel sed eum facere. Quisquam minus saepe. Dolor nobis accusamus consequuntur aut enim."
+    },
+    {
+        "fir_id": "d283075d-7422-46bc-98df-21dec343f50c",
+        "date": "2026-04-12",
+        "station": "Kirari Suleman Nagar Police Station",
+        "complainant": "Damyanti Zachariah",
+        "accused": "Chaitanya Dey",
+        "description": "Velit eum totam temporibus ullam. Odio facilis facilis officia. Quod perferendis porro."
+    },
+    {
+        "fir_id": "03972ddd-c4cf-4107-b9e2-1bf252fb9717",
+        "date": "2026-01-18",
+        "station": "Bardhaman Police Station",
+        "complainant": "Eshana Walla",
+        "accused": "Yatan Ranganathan",
+        "description": "Debitis hic ex veniam. Explicabo eveniet nostrum libero ut quas optio.\nDolorum repellat eum laborum laborum harum."
+    },
+    {
+        "fir_id": "e28a99ca-eb46-4985-8418-d8842a99bf4b",
+        "date": "2026-04-16",
+        "station": "Malda Police Station",
+        "complainant": "Ranbir Dhingra",
+        "accused": "Frado Zachariah",
+        "description": "Dolores mollitia ex nemo cum. Dicta quod ut aliquam. Aut illo in odit excepturi architecto at.\nPraesentium ducimus natus rerum doloremque in tempora ipsa. At excepturi iste vitae vero natus ab."
+    },
+    {
+        "fir_id": "e0977efd-ca9c-43c1-ad2f-bfa07b51a530",
+        "date": "2026-09-04",
+        "station": "Nagercoil Police Station",
+        "complainant": "Jacob Pal",
+        "accused": "Hiral Dhar",
+        "description": "Fugiat doloribus distinctio in modi mollitia reprehenderit cupiditate.\nDebitis rem veniam autem. Fuga fugit facere libero explicabo consequatur."
+    },
+    {
+        "fir_id": "f9248a19-e994-41e5-a8ea-d4d2e29d38da",
+        "date": "2026-08-20",
+        "station": "Mahbubnagar Police Station",
+        "complainant": "Samesh Mohanty",
+        "accused": "Alka Varty",
+        "description": "Hic corrupti saepe nisi. Quibusdam sed voluptates facere ullam.\nEarum nemo laborum laborum eveniet."
+    },
+    {
+        "fir_id": "7a70e87b-faf2-4718-86a1-af50ac3fd1fa",
+        "date": "2026-09-07",
+        "station": "Raipur Police Station",
+        "complainant": "Kashvi Brar",
+        "accused": "Guneet Balan",
+        "description": "Incidunt magni et quo dolor omnis. Tempora expedita optio. Dolorum harum tenetur esse rerum culpa officia."
+    },
+    {
+        "fir_id": "6985fc7d-97cf-452b-98c1-889edc556e96",
+        "date": "2026-02-15",
+        "station": "Sri Ganganagar Police Station",
+        "complainant": "Lakshmi Mandal",
+        "accused": "Yashica Ahuja",
+        "description": "Dignissimos at in neque tempore cumque voluptatibus.\nQuas recusandae dolore ut. Doloribus commodi illum vitae consequatur doloribus nulla doloribus."
+    },
+    {
+        "fir_id": "aa9d7749-3b0e-4a3d-8586-72588f5c03e6",
+        "date": "2026-07-30",
+        "station": "Ahmednagar Police Station",
+        "complainant": "Ladli Dube",
+        "accused": "Nachiket Divan",
+        "description": "Beatae eaque nobis labore ipsam. Ex ipsa voluptas et veritatis occaecati maiores.\nIpsa laudantium qui dolores. Asperiores voluptate quam omnis. Omnis laboriosam consequatur debitis libero."
+    },
+    {
+        "fir_id": "f620f630-c56f-46e7-a84d-e671d24ab26d",
+        "date": "2026-04-21",
+        "station": "Rampur Police Station",
+        "complainant": "Ishwar Behl",
+        "accused": "Azaan Karnik",
+        "description": "Quia vitae sunt dicta nihil quaerat possimus. Nostrum veritatis aperiam. Ad accusantium accusamus itaque.\nHarum natus nostrum ratione veniam. Odit quasi quae."
+    },
+    {
+        "fir_id": "184ebf54-0bb8-4242-9eb4-c733df24fd41",
+        "date": "2026-06-05",
+        "station": "Ambala Police Station",
+        "complainant": "Wyatt Shenoy",
+        "accused": "Vyanjana Bahri",
+        "description": "Quisquam fuga enim vel facilis amet. Animi accusamus laborum repellendus magni ipsam possimus.\nRepellat eveniet modi maxime inventore sequi iste. Aut architecto iusto eaque qui porro explicabo fugit."
+    },
+    {
+        "fir_id": "4192f4ba-ca8b-433d-9869-a5eec1e152c6",
+        "date": "2026-08-05",
+        "station": "Sambalpur Police Station",
+        "complainant": "Adya Reddy",
+        "accused": "Meghana Singh",
+        "description": "Exercitationem voluptas distinctio facilis. Saepe nisi ut sapiente.\nQuia quos neque quas quae aliquam. Tenetur quas iste alias. Aperiam delectus omnis itaque sunt."
+    },
+    {
+        "fir_id": "a95dec6a-5d75-4067-9b52-b8dcd71984ef",
+        "date": "2026-02-18",
+        "station": "Phusro Police Station",
+        "complainant": "Gayathri Sarraf",
+        "accused": "Eesha Sha",
+        "description": "Nemo officia adipisci repellat quasi magni. Earum soluta perspiciatis totam iusto alias. Voluptatibus tempore possimus eveniet officia."
+    },
+    {
+        "fir_id": "0be4f6d0-87a8-4ac7-a5b9-e4b262d5f713",
+        "date": "2026-01-01",
+        "station": "North Dumdum Police Station",
+        "complainant": "Matthew Mannan",
+        "accused": "Simon Sheth",
+        "description": "Consequatur laborum amet. Vero error nihil aspernatur temporibus quidem ab. Ratione minima architecto laudantium officia. Sapiente distinctio eveniet harum eligendi eligendi."
+    },
+    {
+        "fir_id": "89b7a6dc-9f5a-4000-baca-e79156d8f004",
+        "date": "2026-08-26",
+        "station": "Thrissur Police Station",
+        "complainant": "Saumya Patil",
+        "accused": "Zilmil Dutt",
+        "description": "Fugiat sunt voluptatibus nisi natus unde. Perspiciatis quidem laboriosam quibusdam aliquam mollitia."
+    }
+]

@@ -1,0 +1,29 @@
+[
+  {
+    "fir_id": "FIR-2026-001",
+    "date": "2026-09-08",
+    "station": "Central Police Station",
+    "complainant": "Synthetic Witness One",
+    "accused": "Vikram Singh",
+    "mobile": "9999988888",
+    "description": "Synthetic demo record: Vikram Singh coordinated a meeting near Central Bus Terminal."
+  },
+  {
+    "fir_id": "FIR-2026-002",
+    "date": "2026-09-08",
+    "station": "Harbor Police Station",
+    "complainant": "Synthetic Witness Two",
+    "accused": "Rohan Mehta",
+    "mobile": "9888877777",
+    "description": "Synthetic demo record: Rohan Mehta coordinated activity near East Market."
+  },
+  {
+    "fir_id": "FIR-2026-003",
+    "date": "2026-09-09",
+    "station": "Central Police Station",
+    "complainant": "Synthetic Witness Three",
+    "accused": "Vikram Singh",
+    "mobile": "9999988888",
+    "description": "Synthetic demo record: Vikram Singh was named again after calls between two groups."
+  }
+]
