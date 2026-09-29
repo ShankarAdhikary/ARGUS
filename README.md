@@ -1,5 +1,6 @@
 # ARGUS — Criminal Network Analysis
 
+[![CI](https://github.com/ShankarAdhikary/ARGUS/actions/workflows/ci.yml/badge.svg)](https://github.com/ShankarAdhikary/ARGUS/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
@@ -27,12 +28,10 @@ You need Docker (with Compose v2), Node.js 18+ and about 6 GB of free RAM.
 git clone https://github.com/ShankarAdhikary/ARGUS.git
 cd ARGUS
 
-# 1. Configure secrets (never commit the .env file)
-cp ARGUS-Pipeline/.env.example ARGUS-Pipeline/.env
-#    Fill in every empty value: POSTGRES_PASSWORD, NEO4J_PASSWORD, ELASTIC_PASSWORD, MINIO_*,
-#    REDIS_PASSWORD, JWT_SECRET, MFA_ENCRYPTION_KEY. Generate random values with:
-#      python3 -c "import os,base64;print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
-#    GROQ_API_KEY / GEMINI_API_KEY are optional (without one, text extraction falls back to regex).
+# 1. Create ARGUS-Pipeline/.env with freshly generated random secrets (never commit that file)
+python3 ARGUS-Pipeline/scripts/init_env.py
+#    Optional: add GROQ_API_KEY or GEMINI_API_KEY to it for better text extraction
+#    (without one, extraction falls back to simple pattern matching).
 
 # 2. Start the backend stack (API, worker, Postgres, Neo4j, Elasticsearch, MinIO, Redis)
 docker compose up -d --build
@@ -65,7 +64,9 @@ These accounts are created on first start when `SEED_DEMO_USERS=true` (the defau
 
 The sign-in page does not show these by default. To get one-click demo buttons in development, set
 `VITE_SHOW_DEMO_ACCOUNTS=true` in `ARGUS-Frontend/.env`. **Set `SEED_DEMO_USERS=false` and change every password
-outside local development.**
+outside local development.** These passwords are published in this public repository, so treat them as known to
+everyone: the API refuses to start in production mode (`ARGUS_ENV` other than `development`) while `SEED_DEMO_USERS=true`
+or while any secret is still a placeholder.
 
 ## Architecture
 
@@ -126,13 +127,21 @@ endpoints and analytics, regional-language extraction beyond the optional Hindi 
 
 ## Screenshots
 
-_Add screenshots here (dashboard, network explorer, case workspace, pattern detail, sign-in with two-step verification)._
+All screenshots use the synthetic demo dataset.
 
-<!--
-![Dashboard](docs/screenshots/dashboard.png)
-![Network explorer](docs/screenshots/network.png)
--->
+| | |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png)<br>**Dashboard** — clickable overview, grouped alerts, live dataset counts | ![Network explorer](docs/screenshots/network-explorer.png)<br>**Network explorer** — people, phones and FIRs; leaf FIRs collapse behind a toggle |
+| ![Patterns](docs/screenshots/patterns-women-safety.png)<br>**Pattern detection** — Women Safety badge only where the FIRs are trafficking-type cases | ![Pattern detail](docs/screenshots/pattern-detail.png)<br>**Pattern detail** — the evidence in plain language, with a supporting sub-graph |
+| ![Case workspace](docs/screenshots/case-workspace.png)<br>**Case workspace** — pinned entities and investigative notes | ![Report builder](docs/screenshots/report-builder.png)<br>**Report builder** — PDF or Word export, limited to this case's patterns |
+| ![Home](docs/screenshots/home.png)<br>**Home** | ![Sign in](docs/screenshots/sign-in.png)<br>**Sign in** (with optional two-step verification) |
+
+## Contributing and security
+
+Issues and pull requests are welcome. CI runs the backend unit tests, type-checks and builds the frontend, and validates the
+Docker Compose stack on every push. To report a vulnerability privately, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-No license has been chosen yet, so all rights are reserved. Add a `LICENSE` file to change that.
+No license has been chosen yet, so all rights are reserved: the code is visible, but nobody has permission to reuse it.
+Add a `LICENSE` file to change that.
