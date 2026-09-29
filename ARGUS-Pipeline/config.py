@@ -97,6 +97,15 @@ LOGIN_LOCKOUT_SECONDS = int(os.getenv("LOGIN_LOCKOUT_SECONDS", "900"))
 MAX_REQUEST_BYTES = int(os.getenv("MAX_REQUEST_BYTES", str(100 * 1024 * 1024)))
 
 
+# Values that appear in this public repository (.env.example, docs, older defaults). They must never be used for real.
+_KNOWN_WEAK = {"changeme", "password", "admin", "secret", "argus-dev-secret-change-in-production"}
+
+
+def is_weak_secret(value: str | None) -> bool:
+    v = (value or "").strip()
+    return len(v) < 12 or v.lower() in _KNOWN_WEAK or v.upper().startswith("CHANGE_ME")
+
+
 def assert_production_safe() -> None:
     """Refuse to boot with unsafe settings unless ARGUS_ENV is dev/local."""
     if _DEV_MODE:
@@ -104,6 +113,13 @@ def assert_production_safe() -> None:
     problems = []
     if len(JWT_SECRET) < 32:
         problems.append("JWT_SECRET must be at least 32 characters")
+    for name, value in (
+        ("JWT_SECRET", JWT_SECRET), ("POSTGRES_PASSWORD", POSTGRES_PASSWORD), ("NEO4J_PASSWORD", NEO4J_PASSWORD),
+        ("MINIO_SECRET_KEY", MINIO_SECRET_KEY), ("REDIS_PASSWORD", REDIS_PASSWORD),
+        ("ELASTICSEARCH_PASSWORD", ELASTICSEARCH_PASSWORD),
+    ):
+        if value and is_weak_secret(value):
+            problems.append(f"{name} is a placeholder or too short (use `python scripts/init_env.py` to generate real ones)")
     if os.getenv("SEED_DEMO_USERS", "false").lower() == "true":
         problems.append("SEED_DEMO_USERS must not be true (demo credentials are public)")
     if "*" in CORS_ORIGINS:
