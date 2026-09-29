@@ -12,7 +12,7 @@ opencv-python-headless>=4.10
 deepface>=0.0.93
 # deepface's retinaface backend refuses to import under Keras 3 (TF >= 2.16)
 # unless the legacy tf-keras shim is installed.
-tf-keras>=2.16
+tf-keras>=2.21.0
 networkx>=3.4,<4
 psycopg2-binary>=2.9,<3
 PyJWT>=2.8,<3
