@@ -1,10 +1,14 @@
-"""Refuse to bring the stack up in production with debug ports published.
+"""Refuse to bring the stack up in production with debug ports published or demo accounts enabled.
 
     python scripts/preflight.py && docker compose up -d
 
-With ARGUS_ENV=production (environment or .env) it inspects the merged compose config and exits 1 if any service
-publishes a debug/datastore port to the host (Neo4j browser 7474, MinIO console 9001, the API's 8000, ...). The only
-ports production may publish are nginx's 80 and 443. In any other ARGUS_ENV it just reports what is published.
+With ARGUS_ENV=production (environment or .env) it inspects the merged compose config and exits 1 if
+  * any service publishes a debug/datastore port to the host (Neo4j browser 7474, MinIO console 9001, the API's 8000, ...);
+    the only ports production may publish are nginx's 80 and 443, or
+  * the api would seed the demo accounts (SEED_DEMO_USERS resolves to true; compose defaults it to true, so it must be set
+    to false explicitly). The API itself also refuses to start if any stored account still has a published demo password
+    (demo_guard.py), which covers accounts created earlier or restored from a dev database.
+In any other ARGUS_ENV it just reports.
 """
 
 from __future__ import annotations
@@ -37,6 +41,18 @@ def violations(config: dict) -> list[str]:
     return [f"{svc} publishes {port} ({FORBIDDEN[port]})" for svc, port in published_ports(config) if port in FORBIDDEN]
 
 
+def seed_violations(config: dict) -> list[str]:
+    """Services whose environment resolves SEED_DEMO_USERS to true (the demo passwords are published in the README)."""
+    out = []
+    for name, svc in (config.get("services") or {}).items():
+        env = svc.get("environment") or {}
+        if isinstance(env, list):
+            env = dict(item.split("=", 1) for item in env if "=" in item)
+        if str(env.get("SEED_DEMO_USERS", "")).strip().lower() == "true":
+            out.append(f"{name} seeds the demo accounts (SEED_DEMO_USERS=true); their passwords are public")
+    return out
+
+
 def env_name() -> str:
     value = os.getenv("ARGUS_ENV")
     if value is None:
@@ -55,9 +71,13 @@ def main() -> int:
     config = json.loads(raw.stdout)
     env = env_name()
     found = violations(config)
-    if env == "production" and found:
-        print("Refusing to start: ARGUS_ENV=production with debug ports open:", *found, sep="\n  - ", file=sys.stderr)
-        print("Remove docker-compose.debug.yml from the compose command.", file=sys.stderr)
+    seeds = seed_violations(config)
+    if env == "production" and (found or seeds):
+        print("Refusing to start: ARGUS_ENV=production is unsafe:", *found, *seeds, sep="\n  - ", file=sys.stderr)
+        if found:
+            print("Remove docker-compose.debug.yml from the compose command.", file=sys.stderr)
+        if seeds:
+            print("Set SEED_DEMO_USERS=false in .env and change or delete any existing demo account.", file=sys.stderr)
         return 1
     print(f"preflight ok (ARGUS_ENV={env}); published host ports: {sorted({p for _, p in published_ports(config)})}")
     return 0

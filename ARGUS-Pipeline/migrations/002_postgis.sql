@@ -40,3 +40,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS suspects_last_known_location_gix ON susp
 CREATE INDEX CONCURRENTLY IF NOT EXISTS sightings_location_gix ON sightings USING GIST (location);
 -- migrate:split
 CREATE INDEX CONCURRENTLY IF NOT EXISTS firs_jurisdiction_idx ON firs (jurisdiction);
+-- migrate:split
+-- After the database image (and so the PostGIS package) is upgraded, bring the extension's catalog objects up to date.
+-- A no-op ("version has not changed") when it already is.
+ALTER EXTENSION postgis UPDATE;

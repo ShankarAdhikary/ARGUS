@@ -46,6 +46,7 @@ from config import (
     VOICE_MAX_BYTES,
 )
 import evidence
+from demo_guard import assert_no_demo_credentials
 import fingerprint
 from scoping import SUSPECT_IN_SCOPE, node_in_scope, path_in_scope
 import geo_risk
@@ -98,6 +99,8 @@ async def _startup() -> None:
         ensure_schema(neo4j_driver)
     except Exception as exc:  # pragma: no cover
         print(f"[!] Graph schema migration failed: {exc}")
+    # Production only: refuse to serve while any account still has a published demo password (raises -> the API exits).
+    await asyncio.to_thread(assert_no_demo_credentials)
 
 app.add_middleware(
     CORSMiddleware,
@@ -820,6 +823,12 @@ async def get_master_dossier(query: str, current_user: dict = Depends(get_curren
     except Exception as e:
         raise HTTPException(status_code=503, detail=_safe_detail(e)) from e
 
+def _face_jurisdiction(current_user: dict) -> str:
+    """Jurisdiction stamped on a newly enrolled face: the enrolling officer's own, or Unassigned for unscoped roles (same rule
+    as FIR enrolment, so an admin's enrolment is never attributed to a district by accident)."""
+    return current_user["jurisdiction"] if search_scope(current_user) else UNASSIGNED
+
+
 @app.post("/api/v1/biometric/enroll")
 async def enroll_suspect(
     name: str = Form(...),
@@ -840,7 +849,10 @@ async def enroll_suspect(
 
         faiss.normalize_L2(embedding.reshape(1, -1))
         suspect_hash = str(uuid.uuid4())
-        face_index.add(embedding, {"hash_id": suspect_hash, "name": name, "fir_id": "N/A"})
+        jurisdiction = _face_jurisdiction(current_user)
+        face_index.add(embedding, {"hash_id": suspect_hash, "name": name, "fir_id": "N/A", "jurisdiction": jurisdiction})
+        log_action(current_user, action="face_enroll", resource="face:enroll",
+                   extra={"suspect_hash": suspect_hash, "image_sha256": hashlib.sha256(content).hexdigest(), "jurisdiction": jurisdiction})
 
         return {"status": "success", "suspect_hash": suspect_hash, "note": "ARCFACE + RETINAFACE (SPEED OPTIMIZED)"}
     
@@ -864,6 +876,7 @@ async def bulk_portal_enroll(
             return {"status": "error", "message": "Provided directory path does not exist."}
         
         count = 0
+        jurisdiction = _face_jurisdiction(current_user)
         extensions = [".jpg", ".jpeg", ".png"]
         
         for file_path in path.rglob("*"):
@@ -880,11 +893,12 @@ async def bulk_portal_enroll(
 
                     faiss.normalize_L2(embedding.reshape(1, -1))
                     suspect_hash = str(uuid.uuid4())
-                    face_index.add(embedding, {"hash_id": suspect_hash, "name": suspect_name, "fir_id": "N/A"})
+                    face_index.add(embedding, {"hash_id": suspect_hash, "name": suspect_name, "fir_id": "N/A", "jurisdiction": jurisdiction})
                     count += 1
                 except Exception:
                     continue
 
+        log_action(current_user, action="face_bulk_enroll", resource="face:portal-folder", extra={"enrolled": count, "jurisdiction": jurisdiction})
         return {
             "status": "success",
             "total_indexed": count,
@@ -896,10 +910,18 @@ async def bulk_portal_enroll(
 @app.post("/api/v1/biometric/hunt")
 async def hunt_suspect(
     file: UploadFile = File(...),
+    case_id: str | None = Form(default=None),
+    justification: str | None = Form(default=None),
     current_user: dict = Depends(get_current_user),
 ):
+    """Match a face against enrolled faces in the caller's jurisdiction. Every search is audit-logged (hit, miss or error)."""
+    scope = search_scope(current_user)
+    probe_sha256 = None
     try:
         content = await file.read()
+        probe_sha256 = hashlib.sha256(content).hexdigest()
+        if case_id:
+            await asyncio.to_thread(_authorize_case, case_id, justification, current_user)
         nparr = np.frombuffer(content, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
@@ -913,20 +935,29 @@ async def hunt_suspect(
 
         faiss.normalize_L2(embedding.reshape(1, -1))
         
-        best = face_index.search(embedding)
-        if best:
-            similarity_score, matched_suspect = best
-            if similarity_score > 0.40:
-                return {
-                    "status": "success",
-                    "match_found": True,
-                    "confidence_score": similarity_score * 100,
-                    "suspect_data": matched_suspect
-                }
+        best = face_index.search(embedding, scope=scope)
+        matched = best if best and best[0] > 0.40 else None
+        log_action(current_user, action="face_hunt", resource=f"case:{case_id}" if case_id else "face:probe", justification=justification,
+                   extra={"probe_sha256": probe_sha256, "jurisdiction_filter": scope, "match_found": bool(matched),
+                          "top_name": matched[1].get("name") if matched else None, "top_fir_id": matched[1].get("fir_id") if matched else None,
+                          "similarity": round(float(matched[0]), 4) if matched else None})
+        if matched:
+            similarity_score, matched_suspect = matched
+            return {
+                "status": "success",
+                "match_found": True,
+                "confidence_score": similarity_score * 100,
+                "suspect_data": matched_suspect
+            }
 
         return {"status": "success", "match_found": False}
     
+    except HTTPException:
+        raise
     except Exception as e:
+        # A failed search is still a search attempt: record it, then answer as before.
+        log_action(current_user, action="face_hunt", resource=f"case:{case_id}" if case_id else "face:probe", justification=justification,
+                   extra={"probe_sha256": probe_sha256, "jurisdiction_filter": scope, "match_found": False, "error": True})
         return {"status": "error", "message": str(e)}
 
 _MAX_ZIP_UNCOMPRESSED_MB = 500
@@ -961,6 +992,7 @@ async def bulk_upload_zip(
             zip_ref.extractall(temp_dir)
         
         count = 0
+        jurisdiction = _face_jurisdiction(current_user)
         extensions = [".jpg", ".jpeg", ".png"]
         
         for root, _, files in os.walk(temp_dir):
@@ -983,11 +1015,13 @@ async def bulk_upload_zip(
 
                         faiss.normalize_L2(embedding.reshape(1, -1))
                         suspect_hash = str(uuid.uuid4())
-                        face_index.add(embedding, {"hash_id": suspect_hash, "name": suspect_name, "fir_id": "N/A"})
+                        face_index.add(embedding, {"hash_id": suspect_hash, "name": suspect_name, "fir_id": "N/A", "jurisdiction": jurisdiction})
                         count += 1
                     except Exception:
                         continue
                         
+        log_action(current_user, action="face_bulk_enroll", resource="face:zip",
+                   extra={"enrolled": count, "jurisdiction": jurisdiction, "zip_sha256": hashlib.sha256(content).hexdigest()})
         return {
             "status": "success", 
             "total_indexed": count, 
@@ -1035,7 +1069,9 @@ async def unified_enroll(
         
         faiss.normalize_L2(embedding.reshape(1, -1))
         suspect_hash = str(uuid.uuid4())
-        face_index.add(embedding, {"hash_id": suspect_hash, "name": accused, "fir_id": fir_id})
+        # Same rule as the FIR record below: the officer's own jurisdiction, Unassigned for unscoped roles.
+        jurisdiction = _face_jurisdiction(current_user)
+        face_index.add(embedding, {"hash_id": suspect_hash, "name": accused, "fir_id": fir_id, "jurisdiction": jurisdiction})
 
         record = {
             "fir_id": fir_id,
@@ -1049,7 +1085,7 @@ async def unified_enroll(
             "station": "ARGUS Command",
             # The enrolling officer's own jurisdiction; unscoped roles (admin...) leave it Unassigned so it is not
             # attributed to a district by accident.
-            "jurisdiction": current_user["jurisdiction"] if search_scope(current_user) else UNASSIGNED,
+            "jurisdiction": jurisdiction,
             "description": f"Target manually enrolled. History: {history}",
             "Image": image_url,
             "accused_canonical": canonical_name(accused),
@@ -1070,6 +1106,8 @@ async def unified_enroll(
                 jurisdiction=record["jurisdiction"],
             )
 
+        log_action(current_user, action="unified_enroll", resource=f"fir:{fir_id[:100]}",
+                   extra={"suspect_hash": suspect_hash, "image_sha256": hashlib.sha256(content).hexdigest(), "jurisdiction": jurisdiction})
         return {"status": "success", "message": "Unified profile created successfully across all grids!"}
     
     except Exception as e:

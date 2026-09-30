@@ -12,10 +12,18 @@ import json
 import os
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import faiss
 import numpy as np
+
+
+# Faces enrolled before jurisdictions were recorded carry none; they count as this, which only unscoped roles can see.
+UNASSIGNED = "Unassigned"
+# When the caller is jurisdiction-scoped the search must look past out-of-scope faces, so it reads up to this many nearest
+# neighbours (exact search; the index is flat) before filtering. A scoped officer can therefore only miss an in-scope face
+# that has more than this many closer out-of-scope faces ahead of it.
+SCOPED_SEARCH_DEPTH = 5000
 
 
 class FaceIndex:
@@ -80,6 +88,27 @@ class FaceIndex:
             finally:
                 fcntl.flock(lock, fcntl.LOCK_UN)
 
+    def remove_where(self, predicate: Callable[[dict], bool]) -> int:
+        """Drop every face whose registry entry satisfies `predicate` (used to clean up test enrolments)."""
+        with self._mutex, open(self._lock_path, "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                self._sync()
+                keep = [i for i, meta in enumerate(self._registry) if not predicate(meta)]
+                removed = len(self._registry) - len(keep)
+                if removed:
+                    vectors = np.load(self._vectors_path)[keep] if keep else np.empty((0, self.dim), np.float32)
+                    tmp_v, tmp_r = self.dir / "vectors.tmp.npy", self.dir / "registry.tmp.json"
+                    np.save(tmp_v, vectors)
+                    tmp_r.write_text(json.dumps([self._registry[i] for i in keep]))
+                    os.replace(tmp_v, self._vectors_path)
+                    os.replace(tmp_r, self._registry_path)
+                    self._loaded_stamp = None
+                    self._sync()
+                return removed
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+
     def remove_by_fir(self, fir_id: str) -> int:
         """Drop every face registered under `fir_id` (used when a suspect record is purged)."""
         with self._mutex, open(self._lock_path, "w") as lock:
@@ -101,11 +130,58 @@ class FaceIndex:
             finally:
                 fcntl.flock(lock, fcntl.LOCK_UN)
 
-    def search(self, embedding: np.ndarray) -> Optional[tuple[float, dict]]:
-        """Best match as (cosine similarity, registry entry), or None if the index is empty."""
+    def search(self, embedding: np.ndarray, scope: Optional[str] = None) -> Optional[tuple[float, dict]]:
+        """Best match as (cosine similarity, registry entry), or None if there is none.
+
+        With `scope` set only faces enrolled in that jurisdiction are eligible, so a jurisdiction-scoped officer can never be
+        shown (or told about) a face that belongs to another jurisdiction. Entries without a jurisdiction are treated as
+        Unassigned and stay invisible to scoped callers.
+        """
         with self._mutex:
             self._sync()
             if self._index.ntotal == 0:
                 return None
-            distances, indices = self._index.search(np.ascontiguousarray(embedding.reshape(1, -1), dtype=np.float32), 1)
-            return float(distances[0][0]), self._registry[int(indices[0][0])]
+            k = 1 if scope is None else min(self._index.ntotal, SCOPED_SEARCH_DEPTH)
+            distances, indices = self._index.search(np.ascontiguousarray(embedding.reshape(1, -1), dtype=np.float32), k)
+            for score, position in zip(distances[0], indices[0]):
+                if position < 0:
+                    continue
+                meta = self._registry[int(position)]
+                if scope is None or meta.get("jurisdiction", UNASSIGNED) == scope:
+                    return float(score), meta
+            return None
+
+    def backfill_jurisdiction(self, resolve: Callable[[dict], Optional[str]], apply: bool = True) -> dict:
+        """Give legacy entries (no `jurisdiction`) one, using `resolve(meta)`; entries it cannot resolve become Unassigned.
+
+        Only the registry is rewritten (vectors are untouched). With apply=False nothing is written: it just reports.
+        Returns {"already": n, "resolved": n, "unassigned": n, "by_jurisdiction": {...}}.
+        """
+        with self._mutex, open(self._lock_path, "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                self._sync()
+                already, resolved, unassigned, by_j = 0, 0, 0, {}
+                registry = []
+                for meta in self._registry:
+                    if "jurisdiction" in meta:
+                        already += 1
+                        registry.append(meta)
+                        continue
+                    found = resolve(meta)
+                    if found and found != UNASSIGNED:
+                        resolved += 1
+                    else:
+                        unassigned += 1
+                        found = UNASSIGNED
+                    by_j[found] = by_j.get(found, 0) + 1
+                    registry.append({**meta, "jurisdiction": found})
+                if apply and (resolved or unassigned):
+                    tmp_r = self.dir / "registry.tmp.json"
+                    tmp_r.write_text(json.dumps(registry))
+                    os.replace(tmp_r, self._registry_path)
+                    self._loaded_stamp = None
+                    self._sync()
+                return {"already": already, "resolved": resolved, "unassigned": unassigned, "by_jurisdiction": by_j}
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
