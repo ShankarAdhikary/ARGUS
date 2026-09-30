@@ -216,3 +216,17 @@ been run on real recordings.
   every label `Uncalibrated: ranking only`. With one, only candidates at or above the measured 0.1% false-accept threshold are
   listed. Every result is labelled "Investigative lead — requires forensic voice expert confirmation before use in proceedings."
 - Audio below the minimum net speech (3 s) is refused with 422. Raw audio is never stored, only a 192-d embedding and the sample's SHA-256.
+
+## Fingerprint calibration (per print type)
+
+- `scripts/evaluate_fingerprint.py` scores every probe against the rolled gallery offline, through the same engine, quality gate and
+  minutiae floors the service uses, and prints per mode (`rolled`, `latent` = real lifts, `latent_crop` = stand-ins) the false-accept
+  and false-reject rates for scores 20-100 in steps of 5, with a 95% upper bound on the false-accept rate. Different fingers of one
+  person are reported as their own impostor group. `--dry-run` never writes.
+- It writes `uploads/fingerprint-calibration.json` only for a mode with >= 100 fingers, >= 100 genuine and >= 10,000 impostor trials
+  (latent also >= 50 real lifts; crops never count) and only with `--provenance` naming the data source. Otherwise it exits 2.
+- The service reads that file at start-up (`FINGERPRINT_CALIBRATION_FILE`): a calibrated mode uses its measured operating threshold
+  and bands instead of 40 / 70; an uncalibrated mode keeps the defaults. `GET /biometric/fingerprint/status` reports
+  `thresholds` and `calibrated` per print type; `POST .../match` returns `threshold_used` and `calibrated`.
+- The voice and fingerprint evaluations now share their statistics (`evalstats.py`).
+

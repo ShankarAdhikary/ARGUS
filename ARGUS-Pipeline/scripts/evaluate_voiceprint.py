@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 
 import voiceprint
+from evalstats import eer_of, frr_at, threshold_at_far   # noqa: F401  (re-exported: the tests use ev.eer_of etc.)
 
 FAR_POINTS = {"far_1pct": 0.01, "far_0_1pct": 0.001, "far_0_01pct": 0.0001}
 
@@ -60,29 +61,6 @@ def pair_scores(embeddings: np.ndarray, meta: list[dict]) -> dict:
     genuine = same & (session[i] != session[j])
     impostor = ~same
     return {"i": i, "j": j, "score": sim[i, j], "genuine": genuine, "impostor": impostor, "sim": sim}
-
-
-def eer_of(genuine: np.ndarray, impostor: np.ndarray) -> tuple[float, float]:
-    """(EER, threshold at the EER). Returns (nan, nan) if either side is empty. O(n log n): FAR/FRR from sorted scores."""
-    if len(genuine) == 0 or len(impostor) == 0:
-        return float("nan"), float("nan")
-    grid = np.unique(np.concatenate([genuine, impostor]))
-    imp, gen = np.sort(impostor), np.sort(genuine)
-    far = 1.0 - np.searchsorted(imp, grid, side="left") / len(imp)        # share of impostors scoring >= t
-    frr = np.searchsorted(gen, grid, side="left") / len(gen)              # share of genuine scoring < t
-    k = int(np.argmin(np.abs(far - frr)))
-    return float((far[k] + frr[k]) / 2), float(grid[k])
-
-
-def threshold_at_far(impostor: np.ndarray, far: float) -> float | None:
-    """Lowest threshold whose false-accept rate is at most `far`; None if there are too few impostor trials to support it."""
-    if len(impostor) < 10.0 / far:
-        return None
-    return float(np.nextafter(np.quantile(impostor, 1.0 - far, method="higher"), np.inf))
-
-
-def frr_at(genuine: np.ndarray, threshold: float | None) -> float | None:
-    return None if threshold is None or len(genuine) == 0 else float((genuine < threshold).mean())
 
 
 def summarise(genuine: np.ndarray, impostor: np.ndarray) -> dict:

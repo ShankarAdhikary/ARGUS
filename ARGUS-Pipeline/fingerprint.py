@@ -47,6 +47,7 @@ MIN_MINUTIAE = int(os.getenv("FINGERPRINT_MIN_MINUTIAE", "12"))          # below
 MIN_MINUTIAE_LATENT = int(os.getenv("FINGERPRINT_MIN_MINUTIAE_LATENT", "8"))
 MATCH_THREADS = max(1, int(os.getenv("FINGERPRINT_MATCH_THREADS", str(min(4, os.cpu_count() or 1)))))
 PARALLEL_MIN_CANDIDATES = 200                                            # below this a thread pool costs more than it saves
+CALIBRATION_FILE = os.getenv("FINGERPRINT_CALIBRATION_FILE", "uploads/fingerprint-calibration.json")
 FULL_QUALITY_MINUTIAE = 40                                              # minutiae count that maps to a quality score of 100
 BUCKET = "fingerprint-index"
 OBJECT_KEY = "index.json"
@@ -124,13 +125,69 @@ def quality_of(template: Template, print_type: str = "rolled") -> dict:
             "method": "minutiae-count", "minutiae": template.minutiae, "minimum_minutiae": floor}
 
 
-def confidence_label(score: float, print_type: str = "rolled") -> str:
-    """High >= 70, Medium 40-69, else Low / insufficient. For a latent probe the label says so, because a field officer
-    reading "Medium" should know it came from a crime-scene fragment and not from a rolled print."""
-    band = "High" if score >= HIGH_CONFIDENCE else "Medium" if score >= MATCH_THRESHOLD else None
+def confidence_label(score: float, print_type: str = "rolled", floor: float = MATCH_THRESHOLD, high: float = HIGH_CONFIDENCE) -> str:
+    """High >= `high` (70), Medium from `floor` (40), else Low / insufficient. For a latent probe the label says so, because a
+    field officer reading "Medium" should know it came from a crime-scene fragment and not from a rolled print. With a
+    calibration, `floor` and `high` are the measured thresholds for that print type."""
+    band = "High" if score >= high else "Medium" if score >= floor else None
     if band is None:
         return "Low / insufficient"
     return f"{band} / latent match" if print_type == "latent" else band
+
+
+# ---------------------------------------------------------------------------
+# Calibration (written by scripts/evaluate_fingerprint.py; per print type)
+# ---------------------------------------------------------------------------
+
+# What one mode's evaluation must contain before it may set that mode's threshold. Shared with the evaluation script.
+CALIBRATION_MIN = {
+    "fingers": 100,                    # distinct fingers among the gallery
+    "genuine_trials": 100,             # same-finger comparisons
+    "impostor_trials": 10_000,         # ~10 expected errors at a 0.1% false-accept rate
+    "impostor_trials_for_far_0_01pct": 100_000,
+    "real_latent_probes": 50,          # latent mode only: probes that are real crime-scene lifts (crops of rolled prints do not count)
+}
+
+
+def mode_shortfalls(mode: str, counts: dict) -> list[str]:
+    """Why this mode's evaluation is not enough to set a threshold (empty list = enough)."""
+    problems = []
+    for key, label in (("fingers", "fingers"), ("genuine_trials", "genuine trials"), ("impostor_trials", "impostor trials")):
+        if counts.get(key, 0) < CALIBRATION_MIN[key]:
+            problems.append(f"{counts.get(key, 0)} {label}, need at least {CALIBRATION_MIN[key]}")
+    if mode == "latent" and counts.get("real_latent_probes", 0) < CALIBRATION_MIN["real_latent_probes"]:
+        problems.append(f"{counts.get('real_latent_probes', 0)} real latent lifts, need at least {CALIBRATION_MIN['real_latent_probes']} "
+                        "(cropped rolled prints are not latents)")
+    return problems
+
+
+@dataclass
+class Calibration:
+    engine: str
+    created_at: str
+    provenance: str
+    modes: dict     # print type -> {"operating": t, "far_1pct": t, "far_0_1pct": t, "far_0_01pct": t | None} for calibrated modes only
+
+
+def load_calibration(path: Optional[str], engine_name: str) -> tuple[Optional[Calibration], Optional[str]]:
+    """(calibration, None) or (None, why not). A mode that fails the minimum-data check is dropped, never guessed."""
+    if not path or not os.path.isfile(path):
+        return None, "no calibration file (thresholds are the SourceAFIS defaults)"
+    try:
+        doc = json.loads(open(path, encoding="utf-8").read())
+        if doc.get("engine") != engine_name:
+            return None, f"calibration was made for engine {doc.get('engine')!r}, not {engine_name!r}: re-run the evaluation"
+        if not str(doc.get("provenance", "")).strip():
+            return None, "calibration does not record where its data came from"
+        modes = {}
+        for mode, info in (doc.get("modes") or {}).items():
+            if mode in PRINT_TYPES and info and not mode_shortfalls(mode, info.get("counts", {})) and isinstance(info.get("thresholds", {}).get("operating"), (int, float)):
+                modes[mode] = info["thresholds"]
+        if not modes:
+            return None, "calibration has no mode that meets the minimum data requirements"
+        return Calibration(doc["engine"], doc.get("created_at", ""), doc["provenance"], modes), None
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        return None, f"calibration file unreadable: {exc}"
 
 
 # ---------------------------------------------------------------------------
@@ -203,8 +260,10 @@ def _now() -> str:
 
 class FingerprintIndex:
     def __init__(self, store: Store, engine: Optional[FingerprintEngine] = None, *, key: bytes,
-                 lock: Optional[Callable[[], ContextManager]] = None, threshold: float = MATCH_THRESHOLD):
+                 lock: Optional[Callable[[], ContextManager]] = None, threshold: float = MATCH_THRESHOLD,
+                 calibration: Optional[Calibration] = None):
         self.store, self.engine, self.key, self.threshold = store, engine or load_engine(), key, threshold
+        self.calibration = calibration
         self._lock = lock or (lambda: contextlib.nullcontext())
         self._mutex = threading.RLock()
         self._entries: list[dict] = []
@@ -251,6 +310,23 @@ class FingerprintIndex:
         if not quality["passed"]:
             raise LowQualityError(quality["reason"], quality["quality_score"], {k: v for k, v in quality.items() if k != "reason"})
         return quality
+
+    def threshold_for(self, print_type: str = "rolled") -> float:
+        """The score a candidate must reach for this print type: the measured operating threshold if that mode is calibrated, else the default."""
+        mode = (self.calibration.modes.get(print_type) if self.calibration else None)
+        return float(mode["operating"]) if mode else self.threshold
+
+    def calibrated(self, print_type: str) -> bool:
+        return bool(self.calibration and print_type in self.calibration.modes)
+
+    def label_for(self, score: float, print_type: str = "rolled") -> str:
+        floor = self.threshold_for(print_type)
+        mode = self.calibration.modes.get(print_type) if self.calibration else None
+        high = HIGH_CONFIDENCE
+        if mode:                                                # with a calibration, "High" starts where the 0.01% point is known
+            measured = mode.get("far_0_01pct")
+            high = float(measured) if isinstance(measured, (int, float)) else max(HIGH_CONFIDENCE, floor)
+        return confidence_label(score, print_type, floor, max(high, floor))
 
     def engine_status(self) -> dict:
         """{available, message}: available only if an engine is configured AND actually able to run."""

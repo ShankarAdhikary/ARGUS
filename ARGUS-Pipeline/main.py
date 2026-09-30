@@ -176,8 +176,13 @@ embedding_dimension = 512
 face_index = FaceIndex(embedding_dimension, os.getenv("FACE_INDEX_DIR", "uploads/face_index"))
 # Fingerprints: an independent index in its own MinIO bucket ("fingerprint-index"); the comparison engine is pluggable
 # (see fingerprint.py: SourceAFIS has no PyPI package, so the default engine reports "not installed").
+_fp_engine = fingerprint.load_engine()
+_fp_calibration, _fp_why = fingerprint.load_calibration(fingerprint.CALIBRATION_FILE, _fp_engine.name)
+if _fp_calibration is None:
+    print(f"[i] Fingerprint thresholds are the SourceAFIS defaults: {_fp_why}")
 fingerprint_index = fingerprint.FingerprintIndex(
-    fingerprint.MinioStore(minio_client), key=fingerprint.derive_key(JWT_SECRET), lock=fingerprint.redis_lock(redis_client),
+    fingerprint.MinioStore(minio_client), _fp_engine, key=fingerprint.derive_key(JWT_SECRET), lock=fingerprint.redis_lock(redis_client),
+    calibration=_fp_calibration,
 )
 
 
@@ -1174,6 +1179,8 @@ async def fingerprint_status(current_user: dict = Depends(get_current_user)):
         raise _fp_integrity(exc) from exc
     engine = fingerprint_index.engine_status()
     return {"engine": fingerprint_index.engine.name, "available": engine["available"], "match_threshold": fingerprint_index.threshold,
+            "thresholds": {t: fingerprint_index.threshold_for(t) for t in fingerprint.PRINT_TYPES},
+            "calibrated": {t: fingerprint_index.calibrated(t) for t in fingerprint.PRINT_TYPES},
             "enrolled": enrolled, "message": engine["message"]}
 
 
@@ -1242,14 +1249,15 @@ async def fingerprint_match(
         raise HTTPException(status_code=422, detail={"quality_too_low": True, "quality_score": quality["quality_score"], "nfiq_score": None,
                                                       "quality_check": quality, "message": outcome.get("message") or "Print quality too low to search."})
     candidates = [
-        {"rank": h["rank"], "name": h["name"], "fir_id": h["fir_id"], "score": h["score"], "confidence_label": fingerprint.confidence_label(h["score"], print_type)}
-        for h in outcome["hits"] if h["score"] >= fingerprint_index.threshold
+        {"rank": h["rank"], "name": h["name"], "fir_id": h["fir_id"], "score": h["score"], "confidence_label": fingerprint_index.label_for(h["score"], print_type)}
+        for h in outcome["hits"] if h["score"] >= fingerprint_index.threshold_for(print_type)
     ]
     log_action(current_user, action="fingerprint_match", resource=f"case:{case_id}" if case_id else "fingerprint:probe", justification=justification,
                extra={"probe_sha256": hashlib.sha256(data).hexdigest(), "jurisdiction_filter": scope, "quality_passed": quality["passed"], "print_type": print_type,
                       "match_found": bool(candidates), "top_candidate": candidates[0]["name"] if candidates else None,
                       "top_score": candidates[0]["score"] if candidates else None})
-    return {"match_found": bool(candidates), "print_type": print_type, "quality_check": quality, "quality_too_low": False,
+    return {"match_found": bool(candidates), "print_type": print_type, "threshold_used": fingerprint_index.threshold_for(print_type),
+            "calibrated": fingerprint_index.calibrated(print_type), "quality_check": quality, "quality_too_low": False,
             "candidates": candidates, "disclaimer": fingerprint.DISCLAIMER}
 
 
