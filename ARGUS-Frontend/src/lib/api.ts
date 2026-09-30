@@ -17,6 +17,9 @@ import type {
   LedgerResponse,
   EvidenceVerification,
   VoiceResult,
+  FingerprintMatchResult,
+  FingerprintEnrollResult,
+  FingerprintStatus,
   RiskForecastResponse,
   WsrsLeaderboardResponse,
   Role,
@@ -92,13 +95,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     : await response.text();
 
   if (!response.ok) {
+    const detail = typeof body === "object" && body && "detail" in body ? (body as Record<string, unknown>).detail : undefined;
     const message =
-      typeof body === "object" && body && "detail" in body
-        ? String((body as Record<string, unknown>).detail)
+      detail !== undefined
+        // Structured errors (e.g. a fingerprint that is too poor to enrol) carry their text in detail.message.
+        ? typeof detail === "object" && detail && "message" in detail ? String((detail as Record<string, unknown>).message) : String(detail)
         : typeof body === "object" && body && "message" in body
         ? String((body as Record<string, unknown>).message)
         : `Request failed (${response.status})`;
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, detail && typeof detail === "object" ? (detail as Record<string, unknown>) : undefined);
   }
   return body as T;
 }
@@ -118,9 +123,12 @@ async function requestBlob(path: string, options: RequestInit = {}): Promise<Blo
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** The structured `detail` object when the API sent one (e.g. quality_check for a fingerprint that was refused). */
+  detail?: Record<string, unknown>;
+  constructor(message: string, status: number, detail?: Record<string, unknown>) {
     super(message);
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -232,6 +240,27 @@ export function biometricUnifiedEnroll(fields: Record<string, string>, file: Fil
   Object.entries(fields).forEach(([key, value]) => form.append(key, value));
   form.append("file", file);
   return request<Record<string, unknown>>("/api/v1/biometric/unified-enroll", { method: "POST", body: form });
+}
+
+export function fingerprintStatus() {
+  return request<FingerprintStatus>("/api/v1/biometric/fingerprint/status");
+}
+
+export function fingerprintMatch(file: File, printType: "rolled" | "latent" = "rolled", caseId?: string, justification?: string) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("print_type", printType);
+  if (caseId) form.append("case_id", caseId);
+  if (justification) form.append("justification", justification);
+  return request<FingerprintMatchResult>("/api/v1/biometric/fingerprint/match", { method: "POST", body: form });
+}
+
+export function fingerprintEnroll(fields: { name: string; fir_id: string }, file: File) {
+  const form = new FormData();
+  form.append("name", fields.name);
+  form.append("fir_id", fields.fir_id);
+  form.append("file", file);
+  return request<FingerprintEnrollResult>("/api/v1/biometric/fingerprint/enroll", { method: "POST", body: form });
 }
 
 export function biometricBulkZip(file: File) {

@@ -245,3 +245,42 @@ export interface VoiceResult {
   };
   message: string;
 }
+
+export type FingerprintPrintType = "rolled" | "latent";
+
+export interface FingerprintQualityCheck {
+  passed: boolean;
+  quality_score: number;
+  /** Always null: no NFIQ/NFIQ2 is computed. `method` names the measure that produced quality_score. */
+  nfiq_score: number | null;
+  method?: string;
+  minutiae?: number;
+  minimum_minutiae?: number;
+  valid_blocks?: number;
+  ink_blocks?: number;
+}
+
+export interface FingerprintMatchResult {
+  match_found: boolean;
+  print_type?: FingerprintPrintType;
+  quality_check: FingerprintQualityCheck;
+  quality_too_low?: boolean;
+  candidates: Array<{ rank: number; name: string; fir_id: string; score: number; confidence_label: string }>;
+  disclaimer: string;
+}
+
+export interface FingerprintEnrollResult {
+  suspect_id: string;
+  name: string;
+  fir_id: string;
+  enrolled_at: string;
+  message: string;
+}
+
+export interface FingerprintStatus {
+  engine: string;
+  available: boolean;
+  match_threshold: number;
+  enrolled: number;
+  message: string | null;
+}

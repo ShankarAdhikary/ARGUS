@@ -170,3 +170,18 @@ evidence-ledger row and an audit entry. `/ingest/text` responses gain `legal_sec
 `/resolve/check` matches across scripts (`match_type: transliteration_match`). `/network/phone`, `/network/financial`,
 `/network/path` and `/analytics/burners` are jurisdiction-scoped for scoped roles; an out-of-scope node answers like an
 unknown one. The API is no longer published on port 8000: it is reached through nginx over TLS.
+
+## Fingerprint identification
+
+- `GET /api/v1/biometric/fingerprint/status`, `POST /api/v1/biometric/fingerprint/match` (any role, scoped to the caller's
+  jurisdiction), `POST /api/v1/biometric/fingerprint/enroll` and `POST /api/v1/biometric/fingerprint/bulk-enroll-zip`
+  (supervisor/admin). All are audit-logged (probe/image SHA-256, print type, top candidate).
+- Engine: SourceAFIS 3.18 (Java, Apache-2.0) through a JPype bridge, enabled with
+  `FINGERPRINT_ENGINE=fingerprint:JvmSourceAFISEngine`. With no engine configured the endpoints answer 501 with an explanation.
+  The image carries a JRE and 14 jars pinned by SHA-256 (`vendor/sourceafis/`).
+- `match` takes `print_type` (`rolled` | `latent`). Labels: score >= 70 High, 40-69 Medium, below 40 Low / insufficient; for a
+  latent probe the label adds "/ latent match". **Scores are SourceAFIS scores, not a 0-100 scale** (a genuine same-finger pair
+  scored ~235 and an identical print ~548), and they are not comparable with scores from other AFIS products.
+- A print that fails the quality gate (blank, blurred or washed-out image, or too few minutiae) is refused with **422** and a
+  `quality_check` body, before any matching. `nfiq_score` is always `null`: no NFIQ/NFIQ2 is computed; `quality_score` names its
+  `method` (`variance+ridge-frequency` image gate, `minutiae-count`, or the lower of the two).

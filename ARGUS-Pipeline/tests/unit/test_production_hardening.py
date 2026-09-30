@@ -72,7 +72,9 @@ def test_every_secret_file_the_agent_renders_is_read_by_config():
 
 def test_nginx_terminates_tls_and_proxies_to_the_api():
     conf = (ROOT / "nginx/nginx.conf").read_text()
-    assert "listen 443 ssl" in conf and "proxy_pass         http://api:8000" in conf and "TLSv1.3" in conf
+    assert "listen 443 ssl" in conf and "TLSv1.3" in conf and "http://api:8000" in conf
+    # A literal upstream is resolved once at startup and goes stale when the api container is recreated (502s).
+    assert "resolver 127.0.0.11" in conf and "proxy_pass         $api_upstream" in conf and "proxy_pass         http://api" not in conf
     assert "return 301 https://" in conf and "Strict-Transport-Security" in conf
 
 
