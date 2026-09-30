@@ -212,7 +212,10 @@ services:
 
   # ------------------------------------------------------------------ datastores (credentials from /vault/secrets)
   postgres:
-    image: postgis/postgis:16-3.4
+    # postgres:16 + the PostGIS package, on the same Debian base as the stock image (see postgres/Dockerfile: the
+    # postgis/postgis images use an older glibc, which misorders text indexes in a database created by postgres:16).
+    build: ./postgres
+    image: argus-postgres:16-postgis
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set in .env}
