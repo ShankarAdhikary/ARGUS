@@ -389,3 +389,51 @@ def test_status_endpoint_reports_engine_readiness(monkeypatch):
     monkeypatch.setattr(main, "fingerprint_index", FingerprintIndex(MemoryStore(), engine, key=KEY))
     s = TestClient(main.app).get("/api/v1/biometric/fingerprint/status", headers=_auth_headers("investigator")).json()
     assert s["engine"] == "sourceafis-jvm" and s["available"] is False and s["message"]
+
+
+# ---------------------------------------------------------------------------
+# Parallel scoring and the latent minutiae floor
+# ---------------------------------------------------------------------------
+
+def test_parallel_scoring_ranks_exactly_like_the_serial_scan(monkeypatch):
+    idx = make_index()
+    entries = []
+    for i in range(500):                                   # enough to cross PARALLEL_MIN_CANDIDATES; many equal scores on purpose
+        tpl = Template(json.dumps(pts(i % 7, 20)).encode(), 20)
+        entries.append({"suspect_id": str(i), "name": f"P{i}", "fir_id": f"F{i}", "jurisdiction": "J", "enrolled_at": "x",
+                        "minutiae": 20, "template": base64.b64encode(tpl.data).decode(), "deleted": False})
+    idx.store.put(idx._seal(entries))
+    probe = print_image(pts(3, 20))
+    monkeypatch.setattr(fingerprint, "MATCH_THREADS", 1)
+    serial = idx.match(probe, top_k=500)["hits"]
+    monkeypatch.setattr(fingerprint, "MATCH_THREADS", 4)
+    parallel = idx.match(probe, top_k=500)["hits"]
+    assert [(h["suspect_id"], h["score"]) for h in serial] == [(h["suspect_id"], h["score"]) for h in parallel]
+    assert serial[0]["score"] == 100.0 and len(serial) == 500
+    ties = [h["suspect_id"] for h in parallel if h["score"] == 100.0]
+    assert ties == sorted(ties, key=int)                    # equal scores keep enrolment order, so results are reproducible
+
+
+def test_latent_probe_gets_the_lower_minutiae_floor_but_enrolment_does_not():
+    idx = make_index()
+    idx.enroll("Ramesh Kumar", "FIR-1", print_image(pts(1, 20)))
+    nine = print_image(pts(1, 9))                            # a door-handle partial: 9 minutiae
+    rolled = idx.match(nine, print_type="rolled")
+    assert rolled["quality_too_low"] and rolled["quality"]["minimum_minutiae"] == fingerprint.MIN_MINUTIAE == 12
+    latent = idx.match(nine, print_type="latent")
+    assert latent["quality_too_low"] is False and latent["quality"]["minimum_minutiae"] == fingerprint.MIN_MINUTIAE_LATENT == 8
+    assert latent["hits"][0]["name"] == "Ramesh Kumar"
+    assert idx.match(print_image(pts(1, 7)), print_type="latent")["quality_too_low"]        # still not unlimited: below 8 is refused
+    with pytest.raises(LowQualityError):                                                    # enrolling a 9-minutiae print is refused: the floor is not loosened for the index
+        idx.enroll("X", "FIR-2", nine)
+
+
+def test_endpoint_reports_the_floor_that_applied(api):
+    client, idx, _ = api
+    idx.enroll("Ramesh Kumar", "FIR-1", print_image(pts(1, 20)), jurisdiction="Test")
+    nine = print_image(pts(1, 9))
+    r = match(client, "investigator", nine, print_type="rolled")
+    assert r.status_code == 422 and r.json()["detail"]["quality_check"]["minimum_minutiae"] == 12
+    r = match(client, "investigator", nine, print_type="latent")
+    assert r.status_code == 200 and r.json()["quality_check"]["minimum_minutiae"] == 8
+    assert r.json()["candidates"][0]["name"] == "Ramesh Kumar"

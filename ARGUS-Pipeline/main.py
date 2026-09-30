@@ -1163,7 +1163,7 @@ async def fingerprint_match(
         await asyncio.to_thread(_authorize_case, case_id, justification, current_user)
     scope = search_scope(current_user)
     try:
-        outcome = await asyncio.to_thread(fingerprint_index.match, data, 5, scope)
+        outcome = await asyncio.to_thread(fingerprint_index.match, data, 5, scope, print_type)
     except NotImplementedError as exc:
         raise _fp_unavailable(exc) from exc
     except fingerprint.IndexIntegrityError as exc:
