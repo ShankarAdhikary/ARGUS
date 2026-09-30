@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import PageHeader from "../components/PageHeader";
 import { adminMfaReset, auditLog, health, ingestionHealth } from "../lib/api";
 import type { AuditEntry, IngestionHealth } from "../types";
+import { useT } from "../i18n";
 
 export default function Admin() {
+  const t = useT();
   const [ingestion, setIngestion] = useState<IngestionHealth | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [deps, setDeps] = useState<Record<string, boolean> | null>(null);
@@ -23,7 +25,7 @@ export default function Admin() {
 
   return (
     <main>
-      <PageHeader eyebrow="System" title="Admin Console">
+      <PageHeader eyebrow={t("admin.eyebrow")} title={t("admin.title")}>
         Ingestion health, infrastructure status, and tamper-evident audit log. Role: admin only.
       </PageHeader>
 

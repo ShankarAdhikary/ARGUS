@@ -6,10 +6,12 @@ import { exportReport, getCase, listPatterns, logAudit } from "../lib/api";
 import type { ReportFormat } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { CaseDetail, PatternRecord } from "../types";
+import { useT } from "../i18n";
 
 const ALL_SECTIONS = ["Entity List", "Notes", "Pattern Findings", "Source Citations"];
 
 export default function ReportBuilder() {
+  const t = useT();
   const { id = "" } = useParams();
   const { user } = useAuth();
   const [caseRecord, setCaseRecord] = useState<CaseDetail | null>(null);
@@ -83,7 +85,7 @@ export default function ReportBuilder() {
 
   return (
     <main>
-      <PageHeader eyebrow={caseRecord.fir_number} title={`Report Builder — ${caseRecord.title}`}>
+      <PageHeader eyebrow={caseRecord.fir_number} title={`${t("report.title")} — ${caseRecord.title}`}>
         Every AI-derived claim is confidence-tagged and cited. This is an investigative aid, not a final determination.
       </PageHeader>
 

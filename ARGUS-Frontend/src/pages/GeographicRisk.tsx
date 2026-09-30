@@ -11,6 +11,7 @@ import { useAuth } from "../lib/auth";
 import { useAsync } from "../lib/useAsync";
 import { usePageTitle } from "../lib/usePageTitle";
 import type { FeatureCollection } from "geojson";
+import { useT } from "../i18n";
 
 /** Leaflet paints with colour strings, so resolve the theme's CSS variables at render time (dark-mode safe). */
 function themeColour(name: string, fallback: string): string {
@@ -135,12 +136,13 @@ function ForecastPanel({ initial }: { initial: string }) {
 }
 
 export default function GeographicRisk() {
-  usePageTitle("Geographic risk");
+  const t = useT();
+  usePageTitle(t("geographic.title"));
   const { user } = useAuth();
   const canForecast = user?.role !== "investigator"; // the forecast names other jurisdictions
   return (
     <main>
-      <PageHeader eyebrow="Intelligence" title="Geographic risk">
+      <PageHeader eyebrow={t("geographic.eyebrow")} title={t("geographic.title")}>
         Where women-safety FIRs concentrate, and which neighbouring jurisdictions may inherit risk.
       </PageHeader>
       <LeadNotice />

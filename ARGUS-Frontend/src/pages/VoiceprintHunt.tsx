@@ -8,6 +8,7 @@ import { useAuth } from "../lib/auth";
 import { useAsync } from "../lib/useAsync";
 import { usePageTitle } from "../lib/usePageTitle";
 import type { VoiceprintEnrollResult, VoiceprintMatchResult, VoiceprintQuality, VoiceprintStatus } from "../types";
+import { useT } from "../i18n";
 
 const ACCEPT = ".wav,.mp3,.m4a,.ogg";
 const FALLBACK_LABEL = "Investigative lead — requires forensic voice expert confirmation before use in proceedings.";
@@ -32,23 +33,25 @@ function useAudioDuration(file: File | null): number | null {
 }
 
 function AuthorizationField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const t = useT();
   return (
     <label>
-      Authorization reference <span style={{ color: "var(--red)" }} aria-hidden="true">*</span>
+      {t("voiceprint.auth_ref_label")} <span style={{ color: "var(--red)" }} aria-hidden="true">*</span>
       <input value={value} onChange={(e) => onChange(e.target.value)} required minLength={3} maxLength={100} placeholder="e.g. LI/MHA/2026/00417" aria-describedby="lir-help" />
-      <span id="lir-help" className="hint">Enter the lawful interception order number. Required for audit: it is recorded with every enrolment and search.</span>
+      <span id="lir-help" className="hint">{t("voiceprint.auth_ref_hint")}</span>
     </label>
   );
 }
 
 function AudioField({ file, onFile, disabled }: { file: File | null; onFile: (f: File | null) => void; disabled?: boolean }) {
+  const t = useT();
   const seconds = useAudioDuration(file);
   return (
     <label>
-      Audio recording <span style={{ color: "var(--red)" }} aria-hidden="true">*</span>
+      {t("voiceprint.audio_upload")} <span style={{ color: "var(--red)" }} aria-hidden="true">*</span>
       <input type="file" accept={ACCEPT} required disabled={disabled} onChange={(e: ChangeEvent<HTMLInputElement>) => onFile(e.target.files?.[0] ?? null)} />
       <span className="hint">
-        WAV, MP3, M4A or OGG, one speaker per recording, at least 3 seconds of speech.
+        {t("voiceprint.audio_hint")}
         {file && <> Selected: {file.name} · {seconds === null ? "reading length…" : `${seconds.toFixed(1)} s`}</>}
       </span>
     </label>
@@ -68,10 +71,12 @@ function Quality({ q }: { q: VoiceprintQuality }) {
 }
 
 function Disclaimer({ text }: { text: string }) {
-  return <p className="disclaimer-banner" role="note"><strong>Investigative lead only.</strong> {text}</p>;
+  const t = useT();
+  return <p className="disclaimer-banner" role="note"><strong>{t("lead_notice.text")}</strong> {text}</p>;
 }
 
 function StatusBanner({ status }: { status: VoiceprintStatus }) {
+  const t = useT();
   if (status.available) {
     return (
       <p className="hint" style={{ marginBottom: 12 }}>
@@ -83,14 +88,14 @@ function StatusBanner({ status }: { status: VoiceprintStatus }) {
   }
   return (
     <div className="info-banner" role="status" style={{ marginBottom: 14 }}>
-      <strong>{status.enabled ? "Speaker identification is not available." : "Speaker identification is switched off."}</strong>{" "}
-      {status.reason} The form below is shown so the workflow is visible; it is disabled and will work once the deployment has run the
-      evaluation on real recordings and switched the feature on.
+      <strong>{t("voiceprint.status_unavailable")}</strong>{" "}
+      {status.reason && <>{t("voiceprint.status_reason_prefix")}{status.reason}</>}
     </div>
   );
 }
 
 function MatchPanel({ status }: { status: VoiceprintStatus }) {
+  const t = useT();
   const [ref, setRef] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [caseId, setCaseId] = useState("");
@@ -122,14 +127,14 @@ function MatchPanel({ status }: { status: VoiceprintStatus }) {
 
   return (
     <section className="card" aria-labelledby="vp-match-h">
-      <span className="section-label">01 · Match</span>
-      <h2 id="vp-match-h">Match a recording against enrolled voices</h2>
+      <span className="section-label">01 · {t("hunt.match_panel")}</span>
+      <h2 id="vp-match-h">{t("hunt.match_heading")}</h2>
       <form onSubmit={run}>
         <fieldset disabled={!status.available || busy} className="bare-fieldset">
           <AuthorizationField value={ref} onChange={setRef} />
           <AudioField file={file} onFile={(f) => { setFile(f); setResult(null); setRefused(null); }} disabled={!status.available} />
           <label>
-            Case ID <span className="hint">(optional)</span>
+            Case ID <span className="hint">({t("common.optional").toLowerCase()})</span>
             <input value={caseId} onChange={(e) => setCaseId(e.target.value)} placeholder="Attach this search to a case" />
           </label>
           {caseId.trim() && (
@@ -138,7 +143,7 @@ function MatchPanel({ status }: { status: VoiceprintStatus }) {
               <input value={justification} onChange={(e) => setJustification(e.target.value)} />
             </label>
           )}
-          <button disabled={!file || ref.trim().length < 3} style={{ width: "100%", justifyContent: "center" }}>{busy ? "Matching…" : "Run match"}</button>
+          <button disabled={!file || ref.trim().length < 3} style={{ width: "100%", justifyContent: "center" }}>{busy ? t("voiceprint.matching") : t("voiceprint.run_match")}</button>
         </fieldset>
         {busy && <><p className="hint" role="status" style={{ marginTop: 8 }}>Extracting the voiceprint and comparing it with enrolled voices…</p><Skeleton rows={3} /></>}
       </form>
@@ -163,7 +168,7 @@ function MatchPanel({ status }: { status: VoiceprintStatus }) {
           {result.candidates.length > 0 && (
             <div style={{ overflowX: "auto" }}>
               <table className="audit-table" aria-label="Candidate voices">
-                <thead><tr><th>#</th><th>Suspect</th><th>FIR</th><th>Raw score</th><th>Confidence</th></tr></thead>
+                <thead><tr><th>{t("wsrs.rank")}</th><th>{t("wsrs.name")}</th><th>{t("hunt.fir_id")}</th><th>{t("wsrs.score")}</th><th>{t("patterns.confidence")}</th></tr></thead>
                 <tbody>
                   {result.candidates.map((c) => (
                     <tr key={`${c.rank}-${c.fir_id}`}>
@@ -185,6 +190,7 @@ function MatchPanel({ status }: { status: VoiceprintStatus }) {
 }
 
 function EnrollPanel({ status }: { status: VoiceprintStatus }) {
+  const t = useT();
   const [fields, setFields] = useState({ name: "", fir_id: "", lawful_interception_ref: "" });
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -211,21 +217,21 @@ function EnrollPanel({ status }: { status: VoiceprintStatus }) {
 
   return (
     <section className="card" aria-labelledby="vp-enroll-h">
-      <span className="section-label">02 · Enroll</span>
-      <h2 id="vp-enroll-h">Add a voiceprint to the index</h2>
+      <span className="section-label">02 · {t("voiceprint.enroll_panel")}</span>
+      <h2 id="vp-enroll-h">{t("voiceprint.enroll_heading")}</h2>
       <form onSubmit={run}>
         <fieldset disabled={!status.available || busy} className="bare-fieldset">
           <div className="form-row">
-            <label>Name <span style={{ color: "var(--red)" }} aria-hidden="true">*</span>
+            <label>{t("voiceprint.suspect_name")} <span style={{ color: "var(--red)" }} aria-hidden="true">*</span>
               <input value={fields.name} onChange={(e) => setFields((f) => ({ ...f, name: e.target.value }))} required maxLength={200} placeholder="Full name" />
             </label>
-            <label>FIR ID <span style={{ color: "var(--red)" }} aria-hidden="true">*</span>
+            <label>{t("hunt.fir_id")} <span style={{ color: "var(--red)" }} aria-hidden="true">*</span>
               <input value={fields.fir_id} onChange={(e) => setFields((f) => ({ ...f, fir_id: e.target.value }))} required maxLength={100} placeholder="FIR-2026-XXX" />
             </label>
           </div>
           <AuthorizationField value={fields.lawful_interception_ref} onChange={(v) => setFields((f) => ({ ...f, lawful_interception_ref: v }))} />
           <AudioField file={file} onFile={setFile} disabled={!status.available} />
-          <button disabled={!file || fields.lawful_interception_ref.trim().length < 3} style={{ marginTop: 2 }}>{busy ? "Enrolling…" : "Enroll voiceprint"}</button>
+          <button disabled={!file || fields.lawful_interception_ref.trim().length < 3} style={{ marginTop: 2 }}>{busy ? t("voiceprint.enrolling") : t("voiceprint.enroll_button")}</button>
         </fieldset>
         <p className="hint" style={{ marginTop: 8 }}>Only the voiceprint is kept; the recording itself is not stored.</p>
       </form>
@@ -242,6 +248,7 @@ function EnrollPanel({ status }: { status: VoiceprintStatus }) {
 
 function Panels(): ReactNode {
   const { user } = useAuth();
+  const t = useT();
   const status = useAsync(voiceprintStatus);
   const canEnroll = user?.role === "supervisor" || user?.role === "admin"; // the API enforces the same rule
   if (status.loading && !status.data) return <section className="card"><Skeleton rows={4} /></section>;
@@ -249,7 +256,7 @@ function Panels(): ReactNode {
     return (
       <div className="panel-error" role="alert">
         <span>Couldn't check whether speaker identification is available: {status.error}</span>
-        <button type="button" className="link-btn" onClick={status.reload}>Retry</button>
+        <button type="button" className="link-btn" onClick={status.reload}>{t("common.retry")}</button>
       </div>
     );
   }
@@ -265,14 +272,14 @@ function Panels(): ReactNode {
 }
 
 export default function VoiceprintHunt() {
-  usePageTitle("Voice identification");
+  const t = useT();
+  usePageTitle(t("voiceprint.title"));
   return (
     <main>
-      <PageHeader eyebrow="Biometric intelligence" title="Speaker Identification">
-        Compare a recording with enrolled voiceprints. Only for audio obtained under lawful authorization: every search and enrolment
-        records its authorization reference. Speaker identification is weaker evidence than a fingerprint.
+      <PageHeader eyebrow={t("voiceprint.eyebrow")} title={t("voiceprint.title")}>
+        {t("voiceprint.subtitle")}
       </PageHeader>
-      <LeadNotice />
+      <LeadNotice>{t("lead_notice.voice")}</LeadNotice>
       <ErrorBoundary label="speaker identification"><Panels /></ErrorBoundary>
     </main>
   );

@@ -6,6 +6,7 @@ import NetworkGraph from "../components/NetworkGraph";
 import { addCaseEntity, API_BASE_URL, centrality, entityTypeGuess, getToken, listCases, logAudit, networkAccused, networkFinancial, networkPath, networkPhone } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { CaseSummary, CentralityRow, EntityType, GraphElements } from "../types";
+import { useT } from "../i18n";
 
 interface SurveillanceSighting {
   suspect: string;
@@ -16,6 +17,7 @@ interface SurveillanceSighting {
 }
 
 export default function NetworkExplorer() {
+  const t = useT();
   const [params] = useSearchParams();
   const { user } = useAuth();
   const [query, setQuery] = useState(params.get("focus") ?? "");
@@ -186,7 +188,7 @@ export default function NetworkExplorer() {
 
   return (
     <main>
-      <PageHeader eyebrow="Graph explorer" title="Network Explorer">
+      <PageHeader eyebrow={t("network.eyebrow")} title={t("network.title")}>
         Center on any entity, then expand to trace direct and inferred relationships.
         {elements.nodes.length > 0 && (
           <span style={{ marginLeft: 12, background: "var(--purple-bg)", color: "var(--purple-2)", border: "1px solid var(--border-purple)", borderRadius: 4, padding: "2px 8px", fontSize: "0.8125rem", fontWeight: 700 }}>

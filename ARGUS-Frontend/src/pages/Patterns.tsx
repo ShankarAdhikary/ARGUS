@@ -8,6 +8,7 @@ import WomenSafetyBadge from "../components/WomenSafetyBadge";
 import { API_BASE_URL, getToken, listPatterns, patternFeedback } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { PatternRecord } from "../types";
+import { useT } from "../i18n";
 
 interface CommunityCluster {
   cluster_id: number;
@@ -17,6 +18,7 @@ interface CommunityCluster {
 }
 
 export default function Patterns() {
+  const t = useT();
   const { user } = useAuth();
   const [patterns, setPatterns] = useState<PatternRecord[]>([]);
   const [communities, setCommunities] = useState<CommunityCluster[]>([]);
@@ -67,7 +69,7 @@ export default function Patterns() {
 
   return (
     <main>
-      <PageHeader eyebrow="Analytics" title="Pattern Detection">
+      <PageHeader eyebrow={t("patterns.eyebrow")} title={t("patterns.title")}>
         AI-flagged leads — phone hubs, repeat offenders, co-accused clusters, financial structuring and network hubs. Patterns rooted in trafficking-type cases carry a Women Safety badge. Confirm or dismiss each finding to improve future runs.
       </PageHeader>
       <LeadNotice />

@@ -8,10 +8,12 @@ import EvidenceTab from "../components/EvidenceTab";
 import { addCaseNote, auditLog, getCase, logAudit, networkAccused, networkPhone } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { AuditEntry, CaseDetail, EntityType, GraphElements } from "../types";
+import { useT } from "../i18n";
 
 type Tab = "overview" | "network" | "evidence" | "report" | "access";
 
 export default function CaseWorkspace() {
+  const t = useT();
   const { id = "" } = useParams();
   const { user } = useAuth();
   const [caseRecord, setCaseRecord] = useState<CaseDetail | null>(null);
@@ -94,13 +96,13 @@ export default function CaseWorkspace() {
   if (needsJustification) {
     return (
       <main>
-        <PageHeader eyebrow="Access restricted" title={caseRecord?.title ?? "Sensitive case"} />
+        <PageHeader eyebrow={t("case_workspace.sensitive_banner")} title={caseRecord?.title ?? t("dashboard.sensitive_cases")} />
         <section className="card" style={{ maxWidth: 520 }}>
           <SensitiveBanner reason={caseRecord?.sensitivity_reason} />
-          <p className="hint">This case is flagged sensitive. State your investigative justification to proceed — this is recorded in the audit trail.</p>
+          <p className="hint">{t("case_workspace.justification_prompt")}</p>
           <form onSubmit={confirmJustification}>
-            <label>Justification<textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} required /></label>
-            <button>Proceed &amp; log access</button>
+            <label>{t("case_workspace.justification_label")}<textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} required /></label>
+            <button>{t("common.submit")}</button>
           </form>
         </section>
       </main>
@@ -114,7 +116,7 @@ export default function CaseWorkspace() {
       <PageHeader
         eyebrow={`${caseRecord.fir_number} · ${caseRecord.jurisdiction}`}
         title={caseRecord.title}
-        actions={<Link className="btn-link" to={`/cases/${caseRecord.case_id}/report`}>Generate report →</Link>}
+        actions={<Link className="btn-link" to={`/cases/${caseRecord.case_id}/report`}>{t("report.title")} →</Link>}
       >
         <span className={`status-pill status-${caseRecord.status}`}>{caseRecord.status.replace("_", " ")}</span>
       </PageHeader>
@@ -123,15 +125,15 @@ export default function CaseWorkspace() {
       {caseRecord.is_sensitive && <SensitiveBanner reason={caseRecord.sensitivity_reason} />}
 
       <div className="tab-bar">
-        {(["overview", "network", "evidence", "report", "access"] as Tab[]).map((t) => (
-          <button key={t} className={`tab ${tab === t ? "tab-active" : ""}`} onClick={() => setTab(t)}>{t === "report" ? "report builder" : t === "access" ? "access log" : t}</button>
+        {(["overview", "network", "evidence", "report", "access"] as Tab[]).map((tb) => (
+          <button key={tb} className={`tab ${tab === tb ? "tab-active" : ""}`} onClick={() => setTab(tb)}>{tb === "report" ? t("case_workspace.report") : tb === "evidence" ? t("case_workspace.evidence") : tb === "network" ? t("nav.network") : tb === "access" ? "access log" : tb}</button>
         ))}
       </div>
 
       {tab === "overview" && (
         <div className="grid-2">
           <section className="card">
-            <p className="section-label">Pinned entities</p>
+            <p className="section-label">{t("case_workspace.entities")}</p>
             <div className="case-list">
               {caseRecord.entities.map((e) => (
                 <Link key={e.entity_value} to={`/entity/${e.entity_type}/${encodeURIComponent(e.entity_value)}`} className="case-row">
@@ -140,11 +142,11 @@ export default function CaseWorkspace() {
                   <span className="hint">{e.entity_type}</span>
                 </Link>
               ))}
-              {!caseRecord.entities.length && <p className="hint">No entities pinned yet — pin from search or entity detail.</p>}
+              {!caseRecord.entities.length && <p className="hint">{t("case_workspace.no_entities")}</p>}
             </div>
           </section>
           <section className="card">
-            <p className="section-label">Notes</p>
+            <p className="section-label">{t("case_workspace.notes")}</p>
             <div className="note-list">
               {caseRecord.notes.map((n) => (
                 <div key={n.note_id} className="note-item">
@@ -152,11 +154,11 @@ export default function CaseWorkspace() {
                   <span className="hint">{n.author} &middot; {new Date(n.created_at).toLocaleString()}</span>
                 </div>
               ))}
-              {!caseRecord.notes.length && <p className="hint">No notes yet.</p>}
+              {!caseRecord.notes.length && <p className="hint">{t("case_workspace.no_notes")}</p>}
             </div>
             <form className="inline-form" onSubmit={addNote} style={{ marginTop: 12 }}>
-              <input aria-label="Investigative note" placeholder="Add an investigative note…" value={note} onChange={(e) => setNote(e.target.value)} />
-              <button>Add</button>
+              <input aria-label="Investigative note" placeholder={t("case_workspace.note_placeholder")} value={note} onChange={(e) => setNote(e.target.value)} />
+              <button>{t("common.add")}</button>
             </form>
           </section>
         </div>

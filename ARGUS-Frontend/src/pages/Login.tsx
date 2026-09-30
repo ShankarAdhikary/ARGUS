@@ -6,6 +6,7 @@ import { mfaEnrollBegin, mfaEnrollComplete, mfaVerify } from "../lib/api";
 import type { MfaSession } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { usePageTitle } from "../lib/usePageTitle";
+import { useI18n } from "../i18n";
 
 // Demo accounts are hidden unless explicitly enabled (VITE_SHOW_DEMO_ACCOUNTS=true), even in dev,
 // and are never included in production builds.
@@ -27,7 +28,8 @@ type Stage =
 
 export default function Login() {
   const { user, login, completeSession } = useAuth();
-  usePageTitle("Sign in");
+  const { t, lang, setLang } = useI18n();
+  usePageTitle(t("auth.login_title"));
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -121,22 +123,22 @@ export default function Login() {
       <main className="login-main">
         <div className="login-card">
           <div className="login-card-header">
-            <span className="eyebrow">{stage.name === "password" ? "Secure sign-in" : "Two-step verification"}</span>
-            <h1>{stage.name === "password" ? "Access ARGUS" : stage.name === "enroll" ? "Set up your authenticator" : stage.name === "recovery" ? "Save your recovery codes" : "Enter your code"}</h1>
+            <span className="eyebrow">{stage.name === "password" ? t("auth.sign_in") : t("auth.mfa_title")}</span>
+            <h1>{stage.name === "password" ? t("auth.login_title") : stage.name === "enroll" ? "Set up your authenticator" : stage.name === "recovery" ? "Save your recovery codes" : t("auth.mfa_title")}</h1>
             <p>{stage.name === "password" ? "Use your NCRB Employee ID and department password."
-              : stage.name === "code" ? (useRecovery ? "Enter one of your saved recovery codes." : "Open your authenticator app and enter the 6-digit code for ARGUS.")
+              : stage.name === "code" ? (useRecovery ? "Enter one of your saved recovery codes." : t("auth.mfa_prompt"))
               : stage.name === "enroll" ? "Your role requires two-step verification. Scan the code with an authenticator app, then enter the 6-digit code it shows."
               : "Each code works once. Store them somewhere safe — they are the only way in if you lose your phone."}</p>
           </div>
 
           {sessionExpired && !error && stage.name === "password" && (
-            <p className="login-notice warn" role="status">Your session has expired. Please sign in again.</p>
+            <p className="login-notice warn" role="status">{t("auth.session_expired")}</p>
           )}
 
           {stage.name === "password" && (
           <form onSubmit={submit} noValidate>
             <label>
-              Employee ID
+              {t("auth.employee_id")}
               <input
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value)}
@@ -149,7 +151,7 @@ export default function Login() {
               />
             </label>
             <label>
-              Password
+              {t("auth.password")}
               <span className="password-field">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -181,9 +183,9 @@ export default function Login() {
             <button type="submit" className="login-submit" disabled={busy}>
               {busy
                 ? <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    <span className="spinner" /> Authenticating…
+                    <span className="spinner" /> {t("auth.signing_in")}
                   </span>
-                : "Sign in →"}
+                : `${t("auth.sign_in")} →`}
             </button>
           </form>
           )}
@@ -212,12 +214,12 @@ export default function Login() {
               </label>
               <div aria-live="polite">{error && <p className="login-notice error" role="alert">{error}</p>}</div>
               <button type="submit" className="login-submit" disabled={busy}>
-                {busy ? <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><span className="spinner" /> Verifying…</span> : stage.name === "enroll" ? "Verify & continue →" : "Verify →"}
+                {busy ? <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><span className="spinner" /> {t("auth.verify")}…</span> : stage.name === "enroll" ? `${t("auth.verify")} →` : `${t("auth.verify")} →`}
               </button>
               <div className="login-links">
                 {stage.name === "code" && (
                   <button type="button" className="link-btn" onClick={() => { setUseRecovery((v) => !v); setCode(""); setError(""); }}>
-                    {useRecovery ? "Use authenticator code" : "Use a recovery code"}
+                    {useRecovery ? t("auth.totp_code") : t("auth.recovery_code")}
                   </button>
                 )}
                 <button type="button" className="link-btn" onClick={backToPassword}>← Different account</button>
@@ -262,6 +264,9 @@ export default function Login() {
             </>
           )}
         </div>
+        <button type="button" className="link-btn" style={{ margin: "0 auto 10px", display: "block" }} onClick={() => setLang(lang === "en" ? "hi" : "en")} aria-label={t("nav.switch_language")} lang={lang === "en" ? "hi" : "en"}>
+          {lang === "en" ? t("nav.language_toggle") : t("nav.language_toggle_hi")}
+        </button>
         <p className="login-legal">
           Authorised personnel only. Access is logged in a tamper-evident audit trail. Unauthorised access is an offence under the IT Act, 2000.
         </p>

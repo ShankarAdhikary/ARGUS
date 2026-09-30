@@ -5,8 +5,10 @@ import { getJob, health, ingestDataset, ingestText, resolveCheck, resolveDecisio
 import type { ResolveCandidate } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { ApiRecord } from "../types";
+import { useT } from "../i18n";
 
 export default function Ingestion() {
+  const t = useT();
   const { user } = useAuth();
   // The server only lets these roles load data; analysts can still check aliases and job status.
   const canIngest = user?.role !== "analyst";
@@ -84,7 +86,7 @@ export default function Ingestion() {
 
   return (
     <main>
-      <PageHeader eyebrow="Data ingestion" title="Ingestion Console">
+      <PageHeader eyebrow={t("ingestion.eyebrow")} title={t("ingestion.title")}>
         Upload structured FIR/CDR batches or extract entities from unstructured narrative. Every candidate is confidence-scored before it reaches the graph.
       </PageHeader>
 
