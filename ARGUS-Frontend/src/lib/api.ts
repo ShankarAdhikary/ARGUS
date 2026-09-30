@@ -103,7 +103,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const message =
       detail !== undefined
         // Structured errors (e.g. a fingerprint that is too poor to enrol) carry their text in detail.message.
-        ? typeof detail === "object" && detail && "message" in detail ? String((detail as Record<string, unknown>).message) : String(detail)
+        ? Array.isArray(detail)
+          // FastAPI validation errors (422) arrive as a list of {msg, loc, ...}.
+          ? detail.map((d) => (d && typeof d === "object" && "msg" in d ? String((d as { msg: unknown }).msg).replace(/^Value error, /, "") : String(d))).join("; ")
+          : typeof detail === "object" && detail && "message" in detail ? String((detail as Record<string, unknown>).message) : String(detail)
         : typeof body === "object" && body && "message" in body
         ? String((body as Record<string, unknown>).message)
         : `Request failed (${response.status})`;
@@ -300,6 +303,17 @@ export function voiceprintEnroll(fields: { name: string; fir_id: string; lawful_
   form.append("lawful_interception_ref", fields.lawful_interception_ref);
   form.append("file", file);
   return request<VoiceprintEnrollResult>("/api/v1/biometric/voice/enroll", { method: "POST", body: form });
+}
+
+export interface SightingAlert { type: string; suspect: string; explanation: string; sources: string[] }
+export interface SightingInput { suspect_name: string; camera_id: string; zone: string; timestamp: string }
+
+/** Log a manually entered sighting. `timestamp` must carry a UTC offset (toISOString() does). */
+export function logSighting(input: SightingInput) {
+  return request<{ status: string; suspect: string; alerts: SightingAlert[] }>("/api/v1/surveillance/event", {
+    method: "POST",
+    body: JSON.stringify({ ...input, match_confidence: 0 }),
+  });
 }
 
 export function biometricBulkZip(file: File) {

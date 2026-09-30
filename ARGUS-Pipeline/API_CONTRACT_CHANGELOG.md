@@ -24,6 +24,8 @@ the application and regenerating this file in the same change.
 - `GET /api/v1/analytics/wsrs-leaderboard` rows now also carry `fir_count`, `jurisdictions` and `computed_at`; the response has a top-level `computed_at`.
 - `POST /api/v1/resolve/check`, `POST /api/v1/resolve/decision` and `GET /api/v1/resolve/decisions` are now jurisdiction-scoped for scoped roles (candidates outside scope are not returned; an out-of-scope name in a decision answers 404; decision history shows the caller's own decisions only). `decisions` accepts `limit` (1-100).
 - New frontend pages: `/analytics/wsrs` (supervisor, admin), `/biometric/voiceprint`, `/resolve`.
+- `POST /api/v1/surveillance/event` is now jurisdiction-scoped and no longer creates suspects: an unknown suspect, or one outside a scoped officer's jurisdiction, answers 404 `Unknown suspect.` (identical for both). `timestamp` must be ISO-8601 with a UTC offset or `Z` and not in the future (422 otherwise); it is stored as UTC `YYYY-MM-DDTHH:MM:SSZ`. The sighting records `entered_by` and is no longer labelled "Synthetic"; FIR ids in the returned alert are limited to the caller's jurisdiction. The audit entry carries suspect, zone and seen-at time.
+- `GET /api/v1/surveillance/sightings` is jurisdiction-scoped and each row carries `entered_by` (null for ingested camera events).
 
 ## Known intentional MVP boundaries
 

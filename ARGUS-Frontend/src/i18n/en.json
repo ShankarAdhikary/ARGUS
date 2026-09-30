@@ -158,7 +158,15 @@
     "no_results": "No connections found.",
     "centrality": "Centrality Ranking",
     "communities": "Communities",
-    "log_sighting": "Log Sighting"
+    "log_sighting": "Log Sighting",
+    "sighting_hint": "Manual entry. Your name is recorded with it. This is not a camera match.",
+    "sighting_suspect": "Suspect name",
+    "sighting_camera": "Camera ID",
+    "sighting_zone": "Zone / location",
+    "sighting_time": "Date and time seen",
+    "sighting_recorded": "Sighting recorded.",
+    "sighting_alerts": "Alerts raised",
+    "sighting_unknown": "Unknown suspect. Check the spelling, or find the person through Search first."
   },
   "patterns": {
     "title": "Pattern Detection",

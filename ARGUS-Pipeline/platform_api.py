@@ -9,7 +9,7 @@ import os
 import re
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
 import networkx as nx
@@ -21,7 +21,7 @@ from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 from neo4j import GraphDatabase
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from rapidfuzz import fuzz
 
 from audit import log_action, verify_chain
@@ -859,32 +859,54 @@ class SurveillanceEvent(BaseModel):
     timestamp: str = Field(min_length=1, max_length=64)
     match_confidence: float = Field(default=0.0, ge=0, le=1)
 
+    @field_validator("timestamp")
+    @classmethod
+    def _timestamp_is_utc_iso(cls, value: str) -> str:
+        """Cross-zone movement compares timestamps as strings, so they must all share one sortable format.
+        Accepts ISO-8601 with an explicit offset (or Z) and stores UTC; a bare local time is ambiguous and refused."""
+        try:
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("timestamp must be ISO-8601, e.g. 2026-10-01T14:30:00+05:30") from exc
+        if parsed.tzinfo is None:
+            raise ValueError("timestamp must include a timezone offset (e.g. +05:30) or Z")
+        utc = parsed.astimezone(timezone.utc)
+        if utc > datetime.now(timezone.utc) + timedelta(minutes=5):
+            raise ValueError("timestamp is in the future")
+        return utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-def _record_surveillance_event(event: SurveillanceEvent) -> list[dict]:
+
+def _record_surveillance_event(event: SurveillanceEvent, current_user: dict) -> list[dict]:
     """Records a camera sighting and evaluates two alerts: the suspect being on
     an FIR watchlist, and the suspect appearing in a different zone earlier."""
     query = """
+    MATCH (s:Suspect {id: $suspect_id})
+    WHERE $scope IS NULL OR %s
     MERGE (c:Camera {id: $camera_id})
       ON CREATE SET c.zone = $zone
       ON MATCH SET c.zone = $zone
-    MERGE (s:Suspect {id: $suspect_id})
     CREATE (s)-[obs:SEEN_AT {
         timestamp: $timestamp,
         source_id: 'SURV-' + $camera_id,
         confidence: $confidence,
-        evidence: 'Synthetic camera match at ' + $zone
+        evidence: 'Sighting logged by ' + $entered_by + ' at ' + $zone,
+        entered_by: $entered_by
     }]->(c)
     WITH s, c, obs
     OPTIONAL MATCH (s)-[:LINKED_TO_FIR]->(f:FIR)
+      WHERE $scope IS NULL OR f.jurisdiction = $scope
     OPTIONAL MATCH (s)-[prev:SEEN_AT]->(prev_c:Camera)
       WHERE prev_c.id <> c.id AND prev_c.zone <> c.zone AND prev.timestamp < obs.timestamp
     RETURN s.id AS suspect, c.zone AS current_zone, obs.timestamp AS current_time,
            collect(DISTINCT f.id) AS firs,
            collect(DISTINCT {zone: prev_c.zone, at: prev.timestamp}) AS previous
     """
+    query = query % SUSPECT_IN_SCOPE
     with _neo4j.session() as session:
         record = session.run(
             query,
+            scope=search_scope(current_user),
+            entered_by=current_user["full_name"],
             camera_id=event.camera_id,
             zone=event.zone,
             suspect_id=event.suspect_name,
@@ -893,7 +915,9 @@ def _record_surveillance_event(event: SurveillanceEvent) -> list[dict]:
         ).single()
 
     if record is None:
-        return []
+        # Same answer for "no such suspect" and "suspect outside your jurisdiction": a scoped officer must not be able to
+        # probe which names exist elsewhere, and a typo must not silently create a new person in the graph.
+        raise HTTPException(status_code=404, detail="Unknown suspect.")
 
     alerts: list[dict] = []
     firs = [f for f in record["firs"] if f]
@@ -931,11 +955,12 @@ def _record_surveillance_event(event: SurveillanceEvent) -> list[dict]:
 async def surveillance_event(
     event: SurveillanceEvent, current_user: dict = Depends(get_current_user)
 ):
-    alerts = _record_surveillance_event(event)
+    alerts = _record_surveillance_event(event, current_user)
     log_action(
         current_user,
         action="record_surveillance_event",
         resource=f"camera:{event.camera_id}",
+        extra={"suspect": event.suspect_name, "zone": event.zone, "seen_at": event.timestamp},
     )
     return {"status": "recorded", "suspect": event.suspect_name, "alerts": alerts}
 
@@ -944,13 +969,14 @@ async def surveillance_event(
 async def surveillance_sightings(current_user: dict = Depends(get_current_user)):
     query = """
     MATCH (s:Suspect)-[o:SEEN_AT]->(c:Camera)
+    WHERE $scope IS NULL OR %s
     RETURN s.id AS suspect, c.id AS camera, c.zone AS zone,
-           o.timestamp AS timestamp, o.confidence AS confidence
+           o.timestamp AS timestamp, o.confidence AS confidence, o.entered_by AS entered_by
     ORDER BY o.timestamp DESC
     LIMIT 200
-    """
+    """ % SUSPECT_IN_SCOPE
     with _neo4j.session() as session:
-        rows = [dict(r) for r in session.run(query)]
+        rows = [dict(r) for r in session.run(query, scope=search_scope(current_user))]
     log_action(current_user, action="view_sightings", resource="surveillance")
     return rows
 
