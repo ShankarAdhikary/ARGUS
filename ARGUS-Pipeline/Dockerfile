@@ -49,6 +49,19 @@ RUN --mount=type=cache,target=/root/.cache/pip \
       python -c "import whisper; whisper.load_model('${WHISPER_MODEL}', download_root='${WHISPER_CACHE_DIR}')"; \
     fi
 
+# Voice biometrics: SpeechBrain ECAPA-TDNN speaker embeddings (public model, weights baked in so it runs air-gapped).
+# Installed so the evaluation (scripts/evaluate_voiceprint.py) can run in the image; the endpoints are OFF at run time until
+# VOICEPRINT_ENABLED=true, which must wait for that evaluation. Opt out with --build-arg INSTALL_VOICEPRINT=false.
+COPY requirements-voiceprint.txt ./
+ARG INSTALL_VOICEPRINT=true
+RUN --mount=type=cache,target=/root/.cache/pip \
+    if [ "$INSTALL_VOICEPRINT" = "true" ]; then \
+      pip install --default-timeout=120 --retries 10 -r requirements-voiceprint.txt --extra-index-url https://download.pytorch.org/whl/cpu && \
+      mkdir -p /opt/speechbrain-cache && \
+      python -c "from speechbrain.inference.speaker import EncoderClassifier; EncoderClassifier.from_hparams(source='speechbrain/spkrec-ecapa-voxceleb', savedir='/opt/speechbrain-cache/ecapa', run_opts={'device': 'cpu'})"; \
+    fi
+ENV VOICEPRINT_MODEL_DIR=/opt/speechbrain-cache/ecapa
+
 # Fingerprint matching: the SourceAFIS Java library, bridged to Python with JPype. Needs a JRE (headless, ~190 MB).
 # The base image is Debian 13 (trixie), which no longer packages OpenJDK 17; 21 is fine (SourceAFIS needs Java 8+).
 # Opt out of the JVM with: docker compose build --build-arg INSTALL_JVM=false api   (fingerprint matching then answers 501)

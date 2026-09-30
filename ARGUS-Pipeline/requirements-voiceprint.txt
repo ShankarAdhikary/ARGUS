@@ -1,0 +1,6 @@
+# Voice biometrics (speaker identification): SpeechBrain ECAPA-TDNN on CPU. Needs torch (requirements-indic.txt) and ffmpeg
+# (installed by the Dockerfile). The endpoints stay switched off at run time (VOICEPRINT_ENABLED=false) until the evaluation in
+# docs/voice-biometrics-design.md has been run; the image still carries the model so that evaluation can be run in it.
+# Skip with: docker compose build --build-arg INSTALL_VOICEPRINT=false api
+speechbrain>=1.1,<2
+torchaudio>=2.2

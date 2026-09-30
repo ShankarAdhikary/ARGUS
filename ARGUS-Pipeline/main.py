@@ -29,6 +29,8 @@ from config import (
     BUCKET_NAME,
     CORS_ORIGINS,
     JWT_SECRET,
+    VOICEPRINT_CALIBRATION_FILE,
+    VOICEPRINT_ENABLED,
     MAX_REQUEST_BYTES,
     assert_production_safe,
     ELASTICSEARCH_URL,
@@ -45,7 +47,10 @@ from config import (
     REDIS_PORT,
     VOICE_MAX_BYTES,
 )
+import config
 import evidence
+import voiceprint
+import voiceprint_api
 from demo_guard import assert_no_demo_credentials
 import fingerprint
 from scoping import SUSPECT_IN_SCOPE, node_in_scope, path_in_scope
@@ -99,6 +104,8 @@ async def _startup() -> None:
         ensure_schema(neo4j_driver)
     except Exception as exc:  # pragma: no cover
         print(f"[!] Graph schema migration failed: {exc}")
+    if VOICEPRINT_ENABLED:
+        voiceprint_api.assert_ready_for_production(voiceprint_index, config._DEV_MODE)
     # Production only: refuse to serve while any account still has a published demo password (raises -> the API exits).
     await asyncio.to_thread(assert_no_demo_credentials)
 
@@ -1112,6 +1119,24 @@ async def unified_enroll(
     
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+# ---------------------------------------------------------------------------
+# Voice biometrics: registered ONLY when VOICEPRINT_ENABLED=true (otherwise these paths are 404). It must stay off until the
+# evaluation in docs/voice-biometrics-design.md has produced a calibration file; production refuses to start otherwise.
+# ---------------------------------------------------------------------------
+if VOICEPRINT_ENABLED:
+    _engine = voiceprint.load_engine()
+    _calibration, _why_not = voiceprint.load_calibration(VOICEPRINT_CALIBRATION_FILE, _engine.model_id)
+    if _calibration is None:
+        print(f"[!] Voice biometrics running in RANKING-ONLY mode: {_why_not}")
+    voiceprint_index = voiceprint.VoiceprintIndex(
+        fingerprint.MinioStore(minio_client, bucket=voiceprint.BUCKET), _engine,
+        key=fingerprint.derive_key(JWT_SECRET, voiceprint.KEY_PURPOSE), lock=fingerprint.redis_lock(redis_client, "argus:voiceprint-index"),
+        calibration=_calibration,
+    )
+    voiceprint_api.configure(voiceprint_index)
+    app.include_router(voiceprint_api.router)
+
 
 # ---------------------------------------------------------------------------
 # Fingerprint identification (latent and rolled prints)

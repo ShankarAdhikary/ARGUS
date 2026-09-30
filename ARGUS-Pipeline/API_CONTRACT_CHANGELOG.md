@@ -201,3 +201,18 @@ unknown one. The API is no longer published on port 8000: it is reached through 
 - The API refuses to start with `ARGUS_ENV=production` while any stored account still uses a published demo password
   (`demo_guard.py`; fails closed if the check cannot run). `scripts/preflight.py` also refuses when compose would seed the demo
   accounts (`SEED_DEMO_USERS` defaults to true, so production must set it to false explicitly).
+
+## Voice biometrics (speaker identification): built, switched OFF
+
+Design: `docs/voice-biometrics-design.md`. The endpoints below are **not registered** (404) unless `VOICEPRINT_ENABLED=true`, and
+production refuses to start with it enabled and no calibration file. They must stay off until `scripts/evaluate_voiceprint.py` has
+been run on real recordings.
+
+- `GET /api/v1/biometric/voice/status`, `POST .../match` (any role, jurisdiction-scoped), `POST .../enroll` (supervisor/admin).
+- **Every enrolment and match requires `lawful_interception_ref`** (the authorization order number). A missing or placeholder
+  reference is refused with 422 and recorded as a `voiceprint_denied` audit entry; accepted ones are stored on the voiceprint and
+  in the audit row. The system cannot verify the order exists: it is an accountability record.
+- No threshold is hard-coded. Without a calibration file the response is ranking-only: `calibrated: false`, `match_found: null`,
+  every label `Uncalibrated: ranking only`. With one, only candidates at or above the measured 0.1% false-accept threshold are
+  listed. Every result is labelled "Investigative lead — requires forensic voice expert confirmation before use in proceedings."
+- Audio below the minimum net speech (3 s) is refused with 422. Raw audio is never stored, only a 192-d embedding and the sample's SHA-256.
