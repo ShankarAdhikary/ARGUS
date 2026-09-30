@@ -11,12 +11,14 @@ import { useAuth } from "../lib/auth";
 import { relativeTime } from "../lib/format";
 import { usePageTitle } from "../lib/usePageTitle";
 import type { WsrsLeaderboardResponse } from "../types";
+import { TKey, useT } from "../i18n";
 
 const TIERS = ["", "HIGH", "MEDIUM", "LOW"] as const;
 const LIMITS = [25, 50, 100];
 
 function Board() {
   const { user } = useAuth();
+  const t = useT();
   const [tier, setTier] = useState<string>("");
   const [jurisdiction, setJurisdiction] = useState("");
   const [limit, setLimit] = useState(50);
@@ -54,55 +56,55 @@ function Board() {
   const filtered = Boolean(tier || jurisdiction);
   return (
     <>
-      <section className="card" style={{ marginBottom: 14 }} aria-label="Filters">
+      <section className="card" style={{ marginBottom: 14 }} aria-label={t("common.filter")}>
         <div className="page-actions" style={{ alignItems: "flex-end" }}>
           <label>
-            Jurisdiction
+            {t("wsrs.jurisdiction")}
             <select value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)}>
-              <option value="">All jurisdictions</option>
+              <option value="">{t("common.all")}</option>
               {known.map((j) => <option key={j} value={j}>{j}</option>)}
             </select>
           </label>
           <label>
-            Risk tier
+            {t("wsrs.tier")}
             <select value={tier} onChange={(e) => setTier(e.target.value)}>
-              {TIERS.map((t) => <option key={t} value={t}>{t || "All tiers"}</option>)}
+              {TIERS.map((v) => <option key={v} value={v}>{v ? t(`wsrs.${v.toLowerCase()}` as TKey) : t("common.all")}</option>)}
             </select>
           </label>
           <label>
-            Show
+            {t("common.view")}
             <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
-              {LIMITS.map((n) => <option key={n} value={n}>Top {n}</option>)}
+              {LIMITS.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
-          {filtered && <button type="button" className="secondary" onClick={() => { setTier(""); setJurisdiction(""); }}>Clear filters</button>}
+          {filtered && <button type="button" className="secondary" onClick={() => { setTier(""); setJurisdiction(""); }}>{t("common.clear")}</button>}
         </div>
       </section>
 
       <section className="card" aria-busy={loading} aria-labelledby="wsrs-board-h">
         <div className="card-title">
-          <h2 id="wsrs-board-h" className="card-heading">Suspects by Women Safety Risk Score</h2>
+          <h2 id="wsrs-board-h" className="card-heading">{t("wsrs.title")}</h2>
           {data?.computed_at && <span className="hint">Scores computed {relativeTime(data.computed_at)}</span>}
         </div>
         {loading && !data && <Skeleton rows={6} />}
         {error && (
           <div className="panel-error" role="alert">
             <span>Couldn't load the leaderboard: {error}</span>
-            <button type="button" className="link-btn" onClick={load}>Retry</button>
+            <button type="button" className="link-btn" onClick={load}>{t("common.retry")}</button>
           </div>
         )}
         {data && !error && data.suspects.length === 0 && (
           <p className="hint">
             {filtered
               ? "No suspects match these filters."
-              : "No suspects with WSRS scores in this jurisdiction yet. Ingest FIRs to populate scores."}
+              : t("wsrs.no_suspects")}
           </p>
         )}
         {data && !error && data.suspects.length > 0 && (
           <div style={{ overflowX: "auto" }}>
             <table className="audit-table">
               <thead>
-                <tr><th>#</th><th>Suspect</th><th>WSRS</th><th>Tier</th><th>Jurisdiction</th><th title="All FIRs linked to this person; the breakdown shows how many are women-safety FIRs">FIRs</th><th /></tr>
+                <tr><th>{t("wsrs.rank")}</th><th>{t("wsrs.name")}</th><th>{t("wsrs.score")}</th><th>{t("wsrs.tier")}</th><th>{t("wsrs.jurisdiction")}</th><th title="All FIRs linked to this person; the breakdown shows how many are women-safety FIRs">{t("wsrs.fir_count")}</th><th /></tr>
               </thead>
               <tbody>
                 {data.suspects.map((row, i) => {
@@ -119,7 +121,7 @@ function Board() {
                         <td>{row.fir_count} <span className="hint">({row.wsrs.ws_fir_count} women-safety)</span></td>
                         <td>
                           <button type="button" className="link-btn" aria-expanded={expanded} aria-controls={panelId} onClick={() => toggle(row.suspect)}>
-                            {expanded ? "Hide breakdown" : "View breakdown"}
+                            {expanded ? t("wsrs.hide_breakdown") : t("wsrs.view_breakdown")}
                           </button>
                         </td>
                       </tr>
@@ -148,14 +150,14 @@ function Board() {
 }
 
 export default function WsrsLeaderboard() {
-  usePageTitle("High-risk suspects");
+  const t = useT();
+  usePageTitle(t("wsrs.title"));
   return (
     <main>
-      <PageHeader eyebrow="Women Safety Intelligence" title="High-Risk Suspect Leaderboard">
-        WSRS scores are investigative leads — verify before action. Scores are recomputed whenever FIRs are ingested; the recency factor
-        only moves on the next ingest or an admin recompute, so check the "computed" time.
+      <PageHeader eyebrow={t("wsrs.eyebrow")} title={t("wsrs.title")}>
+        {t("wsrs.subtitle")}
       </PageHeader>
-      <LeadNotice />
+      <LeadNotice>{t("lead_notice.wsrs")}</LeadNotice>
       <ErrorBoundary label="the leaderboard"><Board /></ErrorBoundary>
     </main>
   );

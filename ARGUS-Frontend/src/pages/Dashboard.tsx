@@ -20,6 +20,7 @@ import WsrsBadge from "../components/WsrsBadge";
 import ConfidencePill from "../components/ConfidencePill";
 import WomenSafetyBadge from "../components/WomenSafetyBadge";
 import type { AlertRecord } from "../types";
+import { useT } from "../i18n";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -43,7 +44,8 @@ function groupAlerts(alerts: AlertRecord[]) {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  usePageTitle("Dashboard");
+  const t = useT();
+  usePageTitle(t("nav.dashboard"));
   const navigate = useNavigate();
   const cases = useAsync(listCases);
   const alerts = useAsync(listAlerts);
@@ -115,10 +117,10 @@ export default function Dashboard() {
 
       {/* ── Overview: every tile is a shortcut ── */}
       <div className="stat-row" role="list" aria-label="Overview">
-        <StatTile to="/cases" label="Open cases" value={cases.loading ? null : openCases.length} hint="View all cases" />
-        <StatTile to="/alerts" label="Unread alerts" value={alerts.loading ? null : unread.length} hint={unread.length ? "Review now" : "All caught up"} tone={unread.length ? "warn" : undefined} />
-        <StatTile to="/patterns" label="Strong patterns" value={patterns.loading ? null : strongPatterns.length} hint="Confidence 75% or more" tone={strongPatterns.length ? "alert" : undefined} />
-        <StatTile to="/cases" label="Sensitive cases" value={cases.loading ? null : sensitiveCases.length} hint="Access is justified & logged" />
+        <StatTile to="/cases" label={t("dashboard.open_cases")} value={cases.loading ? null : openCases.length} hint="View all cases" />
+        <StatTile to="/alerts" label={t("dashboard.unread_alerts")} value={alerts.loading ? null : unread.length} hint={unread.length ? "Review now" : "All caught up"} tone={unread.length ? "warn" : undefined} />
+        <StatTile to="/patterns" label={t("dashboard.strong_patterns")} value={patterns.loading ? null : strongPatterns.length} hint="Confidence 75% or more" tone={strongPatterns.length ? "alert" : undefined} />
+        <StatTile to="/cases" label={t("dashboard.sensitive_cases")} value={cases.loading ? null : sensitiveCases.length} hint="Access is justified & logged" />
       </div>
 
       {/* ── Search ── */}
@@ -126,12 +128,12 @@ export default function Dashboard() {
         <h2 id="search-h" className="card-heading">Find a person, phone, vehicle or FIR</h2>
         <form onSubmit={submitSearch} className="quick-search-bar" role="search">
           <input
-            aria-label="Search"
-            placeholder="e.g. a name, 9999988888, MH12AB1234 or FIR-2026-0018"
+            aria-label={t("common.search")}
+            placeholder={t("search.placeholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button disabled={!query.trim()}>Search</button>
+          <button disabled={!query.trim()}>{t("common.search")}</button>
         </form>
         <div className="suggest-row">
           {recent.length > 0 && (
@@ -208,9 +210,9 @@ export default function Dashboard() {
         <aside className="dash-col">
           {/* Alerts */}
           <Panel
-            title="Recent alerts"
+            title={t("dashboard.recent_alerts")}
             action={unread.length > 0
-              ? <button type="button" className="link-btn" onClick={() => void readAll()}>Mark all read</button>
+              ? <button type="button" className="link-btn" onClick={() => void readAll()}>{t("dashboard.mark_all_read")}</button>
               : <Link to="/alerts" className="btn-link">All →</Link>}
             state={alerts}
             skeletonRows={3}
@@ -232,7 +234,7 @@ export default function Dashboard() {
 
           {/* Highest-WSRS suspects (supervisor and admin only) */}
           {showSystem && (
-            <Panel title="High-Risk WS Suspects" state={highRisk} skeletonRows={3}>
+            <Panel title={t("nav.wsrs_leaderboard")} state={highRisk} skeletonRows={3}>
               {highRisk.data && (
                 <div className="pattern-mini-list">
                   {highRisk.data.suspects.map((s) => (
@@ -274,12 +276,12 @@ export default function Dashboard() {
 
           {/* Quick actions */}
           <section className="card">
-            <h2 className="card-heading">Quick actions</h2>
+            <h2 className="card-heading">{t("dashboard.quick_actions")}</h2>
             <div className="quick-action-grid">
-              <QuickAction to="/network" label="Network Explorer" iconPath="M8 4c1 0 2 1 2 2s-1 2-2 2-2-1-2-2 1-2 2-2zM3 12c0 0 1-3 5-3s5 3 5 3" />
-              <QuickAction to="/patterns" label="Detected Patterns" iconPath="M2 12l3-4 3 2 3-5 3 2" />
-              <QuickAction to="/hunt" label="Biometric Hunt" iconPath="M8 6a3 3 0 100-6 3 3 0 000 6zM2 14c0-3 2.7-6 6-6s6 3 6 6" />
-              {canIngest && <QuickAction to="/ingestion" label="Ingest Data" iconPath="M8 1v9M5 7l3 3 3-3M3 13h10" />}
+              <QuickAction to="/network" label={t("nav.network")} iconPath="M8 4c1 0 2 1 2 2s-1 2-2 2-2-1-2-2 1-2 2-2zM3 12c0 0 1-3 5-3s5 3 5 3" />
+              <QuickAction to="/patterns" label={t("nav.patterns")} iconPath="M2 12l3-4 3 2 3-5 3 2" />
+              <QuickAction to="/hunt" label={t("nav.hunt")} iconPath="M8 6a3 3 0 100-6 3 3 0 000 6zM2 14c0-3 2.7-6 6-6s6 3 6 6" />
+              {canIngest && <QuickAction to="/ingestion" label={t("nav.ingestion")} iconPath="M8 1v9M5 7l3 3 3-3M3 13h10" />}
             </div>
           </section>
 

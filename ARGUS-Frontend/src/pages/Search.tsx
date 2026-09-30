@@ -4,11 +4,13 @@ import EntityCard from "../components/EntityCard";
 import { entityTypeGuess, resolveCheck, searchFirs } from "../lib/api";
 import { rememberSearch } from "../lib/recent";
 import type { ApiRecord } from "../types";
+import { useT } from "../i18n";
 
 type FilterType = "all" | "person" | "phone" | "fir";
 type ViewMode = "grid" | "table";
 
 export default function Search() {
+  const t = useT();
   const [params, setParams] = useSearchParams();
   const initial = params.get("q") ?? "";
   const [query, setQuery]         = useState(initial);
@@ -60,8 +62,8 @@ export default function Search() {
     <main>
       <header className="page-header">
         <div className="page-header-left">
-          <span className="eyebrow">Entity search</span>
-          <h1>Search</h1>
+          <span className="eyebrow">{t("search.eyebrow")}</span>
+          <h1>{t("search.title")}</h1>
           <p className="page-subtitle">
             Search across FIRs, CDRs, financial records and surveillance. Fuzzy matching and alias detection included.
           </p>
@@ -72,21 +74,21 @@ export default function Search() {
       <div className="card sticky-filter" style={{ marginBottom: 16 }}>
         <form className="inline-form" onSubmit={submit}>
           <input
-            aria-label="Search people, phones, vehicles and FIRs" placeholder="Name, phone number, FIR number…"
+            aria-label={t("search.title")} placeholder={t("search.placeholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
             style={{ fontSize: "0.9rem", padding: "11px 14px" }}
           />
           <button disabled={loading}>
-            {loading ? "Searching…" : "Search"}
+            {loading ? t("common.loading") : t("common.search")}
           </button>
         </form>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
           <div className="filter-chips" style={{ marginTop: 0 }}>
             {(["all", "person", "phone", "fir"] as FilterType[]).map((f) => (
               <button key={f} type="button" className={`chip ${filter === f ? "chip-active" : ""}`} onClick={() => setFilter(f)}>
-                {f === "all" ? "All types" : f.charAt(0).toUpperCase() + f.slice(1)}
+                {f === "all" ? t("common.all") : f === "person" ? t("search.suspects") : f === "phone" ? t("search.phones") : t("search.firs")}
               </button>
             ))}
           </div>
@@ -165,12 +167,12 @@ export default function Search() {
           <table className="audit-table">
             <thead>
               <tr>
-                <th>FIR ID</th>
+                <th>{t("hunt.fir_id")}</th>
                 <th>Accused</th>
                 <th>Station</th>
-                <th>Date</th>
+                <th>{t("common.date")}</th>
                 <th>Network</th>
-                <th>Actions</th>
+                <th>{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>

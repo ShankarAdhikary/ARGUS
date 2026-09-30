@@ -71,7 +71,7 @@ html, body, #root { height: 100%; }
 body {
   color: var(--text);
   background: var(--bg);
-  font-family: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Inter Variable', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -80,7 +80,7 @@ body {
 #root { position: relative; }
 
 /* ── Typography ── */
-code, .mono { font-family: 'JetBrains Mono', monospace; font-size: max(.875em, 12px); color: var(--accent-2); }
+code, .mono { font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: max(.875em, 12px); color: var(--accent-2); }
 a { color: var(--accent-2); text-decoration: none; transition: color .15s; }
 a:hover { color: var(--text-head); }
 
@@ -101,7 +101,7 @@ h2 {
 h3 { font-size: 0.875rem; font-weight: 600; color: var(--text); }
 
 .eyebrow {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -111,7 +111,7 @@ h3 { font-size: 0.875rem; font-weight: 600; color: var(--text); }
   font-weight: 500;
 }
 .section-label {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: .08em;
@@ -161,7 +161,7 @@ h3 { font-size: 0.875rem; font-weight: 600; color: var(--text); }
   letter-spacing: -.02em;
 }
 .sidebar-brand-sub {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   color: var(--text-3);
   letter-spacing: .08em;
@@ -170,7 +170,7 @@ h3 { font-size: 0.875rem; font-weight: 600; color: var(--text); }
   margin-top: 1px;
 }
 .sidebar-classif {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   color: var(--red);
   letter-spacing: .08em;
@@ -182,7 +182,7 @@ h3 { font-size: 0.875rem; font-weight: 600; color: var(--text); }
 
 .sidebar-section { margin-top: 4px; }
 .sidebar-section-label {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   color: var(--text-3);
   font-weight: 500;
@@ -234,7 +234,7 @@ h3 { font-size: 0.875rem; font-weight: 600; color: var(--text); }
   border-radius: var(--radius-sm);
 }
 .sidebar-threat-level {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -275,7 +275,7 @@ h3 { font-size: 0.875rem; font-weight: 600; color: var(--text); }
 }
 .sidebar-user-name { font-size: 0.875rem; font-weight: 600; color: var(--text-head); line-height: 1.3; }
 .sidebar-user-meta {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   color: var(--text-3);
   text-transform: uppercase;
@@ -292,7 +292,7 @@ h3 { font-size: 0.875rem; font-weight: 600; color: var(--text); }
   color: var(--text-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -367,7 +367,7 @@ form { display: grid; gap: 14px; }
 @media (max-width: 680px) { .form-row { grid-template-columns:1fr; } }
 label {
   display: grid; gap: 5px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -396,7 +396,7 @@ select option { background: var(--surface-2); color: var(--text); }
 textarea { resize: vertical; }
 .checkbox-row {
   display: flex; flex-direction: row; align-items: center; gap: 8px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2);
 }
 .checkbox-row input { width: auto; }
@@ -503,7 +503,7 @@ a.secondary:hover { border-color: var(--border-2); background: var(--surface-2);
 .source-chip {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 9px; border-radius: var(--radius-xs);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem; font-weight: 500; letter-spacing: .04em;
   background: var(--surface-2); border: 1px solid var(--border);
   color: var(--text-2); white-space: nowrap; transition: all .15s;
@@ -522,7 +522,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 .sensitive-banner svg { flex-shrink: 0; margin-top: 1px; }
 .sensitive-tag {
   display: inline-flex; align-items: center; gap: 4px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
   padding: 2px 6px; border-radius: var(--radius-xs);
   background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(245,158,11,.2);
@@ -531,7 +531,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 /* ── Status pills ── */
 .status-pill {
   display: inline-flex; align-items: center; gap: 4px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
   padding: 2px 7px; border-radius: var(--radius-xs); border: 1px solid var(--border);
   color: var(--text-3); background: transparent;
@@ -555,13 +555,13 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 .type-phone             { background: var(--type-phone); }
 .type-fir               { background: var(--type-fir); }
 .type-label {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase;
   color: var(--text-3);
 }
 
 /* ── Utility ── */
-.hint { font-size: 0.8125rem; color: var(--text-3); font-family: 'JetBrains Mono', monospace; letter-spacing: .03em; }
+.hint { font-size: 0.8125rem; color: var(--text-3); font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; letter-spacing: .03em; }
 .error {
   padding: 10px 14px; border-radius: var(--radius-sm);
   background: var(--red-bg); border: 1px solid rgba(239,68,68,.2);
@@ -601,7 +601,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
   padding: 80px 20px;
   gap: 12px;
   color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -622,7 +622,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 
 /* ── KV grid ── */
 .kv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 14px 18px; }
-.kv-grid dt { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .08em; }
+.kv-grid dt { font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .08em; }
 .kv-grid dd { font-weight: 600; font-size: 0.875rem; color: var(--text); margin-top: 2px; word-break: break-all; }
 
 /* ── Tabs ── */
@@ -671,7 +671,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 .entity-card-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; font-size: 0.75rem; color: var(--text-3); }
 .entity-card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .entity-card-actions a {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; font-weight: 600;
   letter-spacing: .08em; text-transform: uppercase; color: var(--text-3);
   padding: 3px 7px; border-radius: var(--radius-xs); border: 1px solid var(--border);
   background: transparent; transition: all .15s; text-decoration: none;
@@ -691,7 +691,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
   font-size: 0.875rem; font-weight: 600; color: var(--text-head);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.case-row-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-3); letter-spacing: .05em; }
+.case-row-meta { font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; color: var(--text-3); letter-spacing: .05em; }
 
 /* ── Notes ── */
 .note-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
@@ -700,7 +700,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
   border-left: 2px solid var(--accent-dim); border-radius: var(--radius-sm); padding: 10px 12px;
 }
 .note-item p { margin: 0 0 4px; font-size: 0.875rem; color: var(--text); }
-.note-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-3); letter-spacing: .06em; }
+.note-meta { font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; color: var(--text-3); letter-spacing: .06em; }
 
 /* ── Alert list ── */
 .alert-list { display: flex; flex-direction: column; gap: 3px; }
@@ -724,7 +724,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
   color: var(--text-3); text-align: center; padding: 30px; gap: 12px;
   background: var(--bg); border-radius: var(--radius-lg);
   border: 1px dashed rgba(99,102,241,.15);
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; letter-spacing: .05em;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; letter-spacing: .05em;
 }
 
 /* ── Ranked list ── */
@@ -733,7 +733,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 .ranked-row {
   display: grid; grid-template-columns: 20px 1fr auto; gap: 6px;
   align-items: center; background: transparent; color: var(--text-2);
-  text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+  text-align: left; font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem;
   letter-spacing: .03em; padding: 5px 8px; border-radius: var(--radius-xs);
   border: 1px solid transparent; cursor: pointer; box-shadow: none;
   text-transform: none; transition: all .12s;
@@ -771,13 +771,13 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 .audit-table th {
   text-align: left; padding: 8px 12px;
   border-bottom: 1px solid var(--border); color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem;
   font-weight: 500; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
 }
 .audit-table td {
   padding: 8px 12px; border-bottom: 1px solid var(--border);
   vertical-align: top; color: var(--text-2);
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem;
 }
 .audit-table tr:last-child td { border-bottom: 0; }
 .audit-table tr:hover td { background: var(--surface-2); color: var(--text); }
@@ -807,24 +807,24 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 }
 .dependencies { display: flex; flex-wrap: wrap; gap: 6px; }
 .ready {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; letter-spacing: .08em;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; letter-spacing: .08em;
   padding: 3px 9px; border-radius: var(--radius-xs);
   background: var(--green-bg); color: var(--green); border: 1px solid rgba(34,197,94,.2);
 }
 .down {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; letter-spacing: .08em;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; letter-spacing: .08em;
   padding: 3px 9px; border-radius: var(--radius-xs);
   background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,.2);
 }
 .result { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 .result h3 {
   padding: 10px 16px; border-bottom: 1px solid var(--border);
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem;
   letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 500;
 }
 .result pre {
   margin: 0; padding: 14px 16px; overflow: auto; background: var(--bg);
-  color: var(--green); font-family: 'JetBrains Mono', monospace;
+  color: var(--green); font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem; line-height: 1.7; max-height: 300px;
 }
 
@@ -847,7 +847,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 
 .login-divider {
   display: flex; align-items: center; gap: 12px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace;
   font-size: 0.75rem; color: var(--text-2);
   letter-spacing: .08em; text-transform: uppercase;
   margin: 20px 0 14px;
@@ -863,7 +863,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 }
 .demo-account-btn:hover { background: var(--surface-2); border-color: var(--border-2); color: var(--text-head); }
 .demo-account-btn .role-badge {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+  font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem;
   font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
   padding: 2px 7px; border-radius: var(--radius-xs); white-space: nowrap;
 }
@@ -899,8 +899,8 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 }
 .infra-tile.ok   { border-color: rgba(34,197,94,.18); background: rgba(34,197,94,.03); }
 .infra-tile.down { border-color: rgba(239,68,68,.2); background: var(--red-bg); }
-.infra-status { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
-.infra-name   { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-3); letter-spacing: .04em; }
+.infra-status { font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.infra-name   { font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; color: var(--text-3); letter-spacing: .04em; }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
@@ -961,7 +961,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 .home-nav a:hover { color: var(--text-head); }
 .home-nav .home-signin { color: var(--text-head); border: 1px solid var(--border-accent); background: var(--accent-bg); padding: 7px 16px; border-radius: var(--radius-md); font-weight: 600; }
 .home-nav .home-signin:hover { background: var(--accent-ring); }
-.home-eyebrow { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); }
+.home-eyebrow { display: inline-block; font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); }
 
 .home-hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: center; max-width: 1180px; margin: 0 auto; padding: clamp(40px, 8vw, 96px) clamp(16px, 5vw, 56px); }
 .home-hero h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: 1.05; letter-spacing: -.04em; margin: 14px 0 18px; }
@@ -985,7 +985,7 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 .home-section h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); letter-spacing: -.03em; margin: 10px 0 28px; max-width: 28ch; }
 .home-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; counter-reset: none; }
 .home-steps li { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
-.home-step-n { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--accent-2); }
+.home-step-n { font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.75rem; color: var(--accent-2); }
 .home-steps h3, .home-card h3 { margin: 8px 0 6px; font-size: 1.02rem; }
 .home-steps p, .home-card p { margin: 0; font-size: 0.88rem; line-height: 1.6; color: var(--text-2); }
 .home-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
@@ -1018,9 +1018,9 @@ button.source-chip:hover { border-color: var(--border-accent); color: var(--acce
 /* ── MFA ── */
 .qr { display: block; margin: 0 auto; background: #fff; padding: 8px; border-radius: 10px; }
 .mfa-enroll { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 4px; }
-.mfa-secret { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; letter-spacing: .08em; color: var(--text-head); background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 6px 10px; word-break: break-all; text-align: center; }
+.mfa-secret { font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.9rem; letter-spacing: .08em; color: var(--text-head); background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 6px 10px; word-break: break-all; text-align: center; }
 .recovery-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.recovery-grid li { font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; letter-spacing: .06em; text-align: center; padding: 8px 6px; border: 1px solid var(--border-2); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-head); }
+.recovery-grid li { font-family: 'JetBrains Mono', 'Noto Sans Devanagari', monospace; font-size: 0.875rem; letter-spacing: .06em; text-align: center; padding: 8px 6px; border: 1px solid var(--border-2); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-head); }
 .login-links { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .link-btn { background: transparent; border: none; padding: 2px 0; color: var(--accent-2); font-size: 0.875rem; cursor: pointer; }
 .link-btn:hover { background: transparent; text-decoration: underline; color: var(--text-head); }
@@ -1153,3 +1153,14 @@ button.danger { background: var(--red); border-color: var(--red); color: var(--b
 .resolve-card { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); }
 .resolve-card + .resolve-card { margin-top: 10px; }
 .resolve-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+
+/* Hindi: letter-spacing pulls apart Devanagari conjuncts and the matra joins, so turn it off. */
+:lang(hi) *, :lang(hi) { letter-spacing: normal !important; }
+
+.lang-toggle {
+  display: flex; align-items: center; justify-content: center;
+  margin: 8px 12px; padding: 6px 10px; width: calc(100% - 24px);
+  border: 1px solid var(--border); border-radius: 8px;
+  background: transparent; color: var(--text-2); cursor: pointer; font-size: 0.875rem; font-weight: 600;
+}
+.lang-toggle:hover { color: var(--text); border-color: var(--accent-2); }

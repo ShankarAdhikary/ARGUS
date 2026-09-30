@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { TKey, useI18n } from "../i18n";
 
 const Icons = {
   dashboard: (
@@ -75,49 +76,50 @@ const ArgusLogo = () => (
 
 const SECTIONS = [
   {
-    label: "Investigate",
+    label: "nav.section_investigate" as TKey,
     links: [
-      { to: "/",        label: "Dashboard",       icon: Icons.dashboard, end: true },
-      { to: "/search",  label: "Search",          icon: Icons.search },
-      { to: "/resolve", label: "Name Resolution", icon: Icons.search },
-      { to: "/network", label: "Network Map",     icon: Icons.network },
-      { to: "/cases",   label: "Cases",           icon: Icons.cases },
+      { to: "/",        label: "nav.dashboard" as TKey,       icon: Icons.dashboard, end: true },
+      { to: "/search",  label: "nav.search" as TKey,          icon: Icons.search },
+      { to: "/resolve", label: "nav.entity_resolution" as TKey, icon: Icons.search },
+      { to: "/network", label: "nav.network" as TKey,     icon: Icons.network },
+      { to: "/cases",   label: "nav.cases" as TKey,           icon: Icons.cases },
     ],
   },
   {
-    label: "Intelligence",
+    label: "nav.section_intelligence" as TKey,
     links: [
-      { to: "/patterns", label: "Patterns",       icon: Icons.patterns },
-      { to: "/geo-risk", label: "Geographic Risk", icon: Icons.network },
-      { to: "/alerts",   label: "Alerts",         icon: Icons.alerts },
-      { to: "/hunt",     label: "Biometric Hunt", icon: Icons.biometric },
-      { to: "/biometric/fingerprint", label: "Fingerprint", icon: Icons.biometric },
-      { to: "/biometric/voiceprint", label: "Voiceprint", icon: Icons.biometric },
+      { to: "/patterns", label: "nav.patterns" as TKey,       icon: Icons.patterns },
+      { to: "/geo-risk", label: "nav.geographic_risk" as TKey, icon: Icons.network },
+      { to: "/alerts",   label: "nav.alerts" as TKey,         icon: Icons.alerts },
+      { to: "/hunt",     label: "nav.hunt" as TKey, icon: Icons.biometric },
+      { to: "/biometric/fingerprint", label: "nav.fingerprint" as TKey, icon: Icons.biometric },
+      { to: "/biometric/voiceprint", label: "nav.voiceprint" as TKey, icon: Icons.biometric },
     ],
   },
   {
-    label: "Analytics",
+    label: "nav.analytics" as TKey,
     links: [
-      { to: "/analytics/wsrs", label: "High-Risk Suspects", icon: Icons.patterns, roles: ["supervisor", "admin"] },
+      { to: "/analytics/wsrs", label: "nav.wsrs_leaderboard" as TKey, icon: Icons.patterns, roles: ["supervisor", "admin"] },
     ],
   },
   {
-    label: "Data",
+    label: "nav.section_data" as TKey,
     links: [
-      { to: "/ingestion", label: "Ingestion",     icon: Icons.ingestion },
+      { to: "/ingestion", label: "nav.ingestion" as TKey,     icon: Icons.ingestion },
     ],
   },
   {
-    label: "System",
+    label: "nav.section_system" as TKey,
     links: [
-      { to: "/security", label: "Security", icon: Icons.admin },
-      { to: "/admin", label: "Admin", icon: Icons.admin, roles: ["admin"] },
+      { to: "/security", label: "nav.security" as TKey, icon: Icons.admin },
+      { to: "/admin", label: "nav.admin" as TKey, icon: Icons.admin, roles: ["admin"] },
     ],
   },
 ];
 
 export default function Nav() {
   const { user, logout } = useAuth();
+  const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -152,7 +154,7 @@ export default function Nav() {
   return (
     <>
       <div className="mobile-bar">
-        <button type="button" className="mobile-menu-btn" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="main-nav" onClick={() => setOpen((v) => !v)}>
+        <button type="button" className="mobile-menu-btn" aria-label={open ? t("nav.close_menu") : t("nav.open_menu")} aria-expanded={open} aria-controls="main-nav" onClick={() => setOpen((v) => !v)}>
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
             {open ? <path d="M4 4l12 12M16 4L4 16" /> : <path d="M3 5h14M3 10h14M3 15h14" />}
           </svg>
@@ -181,7 +183,7 @@ export default function Nav() {
         if (!visible.length) return null;
         return (
           <div key={section.label} className="sidebar-section">
-            <p className="sidebar-section-label">{section.label}</p>
+            <p className="sidebar-section-label">{t(section.label)}</p>
             <div className="sidebar-links">
               {visible.map((l) => (
                 <NavLink
@@ -191,7 +193,7 @@ export default function Nav() {
                   className={({ isActive }) => isActive ? "sidebar-link active" : "sidebar-link"}
                 >
                   {l.icon}
-                  {l.label}
+                  {t(l.label)}
                 </NavLink>
               ))}
             </div>
@@ -199,6 +201,17 @@ export default function Nav() {
         );
       })}
 
+      {/* Language: English is the default, Hindi is opt-in */}
+      <button
+        type="button"
+        className="lang-toggle"
+        onClick={() => setLang(lang === "en" ? "hi" : "en")}
+        aria-label={t("nav.switch_language")}
+        title={t("nav.switch_language")}
+        lang={lang === "en" ? "hi" : "en"}
+      >
+        {lang === "en" ? t("nav.language_toggle") : t("nav.language_toggle_hi")}
+      </button>
 
       {/* User */}
       <div className="sidebar-user">
@@ -213,7 +226,7 @@ export default function Nav() {
         </div>
         <button className="sidebar-logout" onClick={signOut}>
           {Icons.logout}
-          Sign out
+          {t("nav.sign_out")}
         </button>
       </div>
     </nav>

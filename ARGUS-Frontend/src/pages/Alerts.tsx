@@ -4,8 +4,10 @@ import PageHeader from "../components/PageHeader";
 import { createAlertRule, entityTypeGuess, listAlertRules, listAlerts, markAlertRead, markAllAlertsRead } from "../lib/api";
 import { relativeTime } from "../lib/format";
 import type { AlertRecord, AlertRule } from "../types";
+import { useT } from "../i18n";
 
 export default function Alerts() {
+  const t = useT();
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [entityValue, setEntityValue] = useState("");
@@ -51,7 +53,7 @@ export default function Alerts() {
 
   return (
     <main>
-      <PageHeader eyebrow="Watchlists" title="Alerts">
+      <PageHeader eyebrow={t("alerts.eyebrow")} title={t("alerts.title")}>
         Get notified when a watched entity appears in new records. {unread.length > 0 && (
           <strong style={{ color: "var(--amber)" }}>{unread.length} unread alert{unread.length === 1 ? "" : "s"}.</strong>
         )}

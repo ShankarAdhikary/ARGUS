@@ -2,8 +2,10 @@ import { ChangeEvent, FormEvent, useState } from "react";
 import PageHeader from "../components/PageHeader";
 import ConfidencePill from "../components/ConfidencePill";
 import { biometricHunt, biometricUnifiedEnroll } from "../lib/api";
+import { useT } from "../i18n";
 
 export default function Hunt() {
+  const t = useT();
   const [huntFile, setHuntFile] = useState<File | null>(null);
   const [huntPreview, setHuntPreview] = useState<string | null>(null);
   const [huntResult, setHuntResult] = useState<{ match_found: boolean; confidence_score?: number; suspect_data?: Record<string, unknown> } | null>(null);
@@ -62,15 +64,15 @@ export default function Hunt() {
 
   return (
     <main>
-      <PageHeader eyebrow="Biometric intelligence" title="Facial Recognition Hunt">
-        ArcFace + RetinaFace embeddings matched against a FAISS index. A match is an investigative lead — always verify before action.
+      <PageHeader eyebrow={t("hunt.eyebrow")} title={t("hunt.title")}>
+        {t("hunt.subtitle")}
       </PageHeader>
 
       <div className="grid-2">
         {/* Hunt panel */}
         <section className="card">
-          <span className="section-label">01 · Hunt</span>
-          <h2>Match photo against enrolled suspects</h2>
+          <span className="section-label">01 · {t("hunt.match_panel")}</span>
+          <h2>{t("hunt.match_heading")}</h2>
           <form onSubmit={runHunt}>
             <label
               className="hunt-dropzone"
@@ -86,14 +88,14 @@ export default function Hunt() {
                     <circle cx="9" cy="9" r="2"/>
                     <path d="M21 15l-5-5L5 21"/>
                   </svg>
-                  <span style={{ fontWeight: 600, color: "var(--text-2)", fontSize: "0.875rem" }}>Click to upload a photo</span>
-                  <span className="hint">JPEG, PNG — suspect photo for matching</span>
+                  <span style={{ fontWeight: 600, color: "var(--text-2)", fontSize: "0.875rem" }}>{t("hunt.upload_prompt")}</span>
+                  <span className="hint">{t("hunt.upload_hint")}</span>
                 </>
               )}
               <input id="hunt-file-input" type="file" accept="image/*" onChange={onHuntFile} style={{ display: "none" }} />
             </label>
             <button disabled={huntBusy || !huntFile} style={{ width: "100%", justifyContent: "center" }}>
-              {huntBusy ? "Matching…" : "Run hunt"}
+              {huntBusy ? t("hunt.matching") : t("hunt.run_hunt")}
             </button>
             {huntBusy && <p className="hint" role="status" style={{ marginTop: 8 }}>Comparing against enrolled faces — this usually takes 5–15 seconds, longer right after a restart.</p>}
           </form>
@@ -107,14 +109,14 @@ export default function Hunt() {
                   <>
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="var(--green)" strokeWidth="1.8" strokeLinecap="round"><path d="M2 8l4 4 8-8"/></svg>
                     <div>
-                      <p style={{ margin: 0, fontWeight: 800, color: "var(--green)" }}>Match found</p>
+                      <p style={{ margin: 0, fontWeight: 800, color: "var(--green)" }}>{t("hunt.match_found")}</p>
                       <ConfidencePill confidence={(huntResult.confidence_score ?? 0) / 100} />
                     </div>
                   </>
                 ) : (
                   <>
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="var(--text-3)" strokeWidth="1.8" strokeLinecap="round"><path d="M12 4L4 12M4 4l8 8"/></svg>
-                    <p style={{ margin: 0, fontWeight: 600, color: "var(--text-3)" }}>No match above confidence threshold</p>
+                    <p style={{ margin: 0, fontWeight: 600, color: "var(--text-3)" }}>{t("hunt.no_match")}</p>
                   </>
                 )}
               </div>
@@ -131,27 +133,27 @@ export default function Hunt() {
 
         {/* Enroll panel */}
         <section className="card">
-          <span className="section-label">02 · Unified enroll</span>
-          <h2>Add a suspect profile</h2>
+          <span className="section-label">02 · {t("hunt.enroll_panel")}</span>
+          <h2>{t("hunt.enroll_heading")}</h2>
           <form onSubmit={runEnroll}>
             <div className="form-row">
-              <label>FIR ID *<input value={fields.fir_id} onChange={onField("fir_id")} required placeholder="FIR-2026-XXX" /></label>
-              <label>Accused name *<input value={fields.accused} onChange={onField("accused")} required placeholder="Full name" /></label>
+              <label>{t("hunt.fir_id")} *<input value={fields.fir_id} onChange={onField("fir_id")} required placeholder="FIR-2026-XXX" /></label>
+              <label>{t("hunt.accused_name")} *<input value={fields.accused} onChange={onField("accused")} required placeholder="Full name" /></label>
             </div>
             <div className="form-row">
-              <label>Mobile<input value={fields.mobile} onChange={onField("mobile")} placeholder="+91 xxxxx xxxxx" /></label>
-              <label>Aadhaar (tokenized)<input value={fields.aadhaar} onChange={onField("aadhaar")} placeholder="XXXX XXXX XXXX" /></label>
+              <label>{t("hunt.mobile")}<input value={fields.mobile} onChange={onField("mobile")} placeholder="+91 xxxxx xxxxx" /></label>
+              <label>{t("hunt.aadhaar")}<input value={fields.aadhaar} onChange={onField("aadhaar")} placeholder="XXXX XXXX XXXX" /></label>
             </div>
             <div className="form-row">
-              <label>Date of birth<input type="date" value={fields.dob} onChange={onField("dob")} /></label>
-              <label>Prison facility<input value={fields.prison} onChange={onField("prison")} placeholder="e.g. Tihar Jail" /></label>
+              <label>{t("hunt.dob")}<input type="date" value={fields.dob} onChange={onField("dob")} /></label>
+              <label>{t("hunt.prison")}<input value={fields.prison} onChange={onField("prison")} placeholder="e.g. Tihar Jail" /></label>
             </div>
-            <label>Criminal history<input value={fields.history} onChange={onField("history")} placeholder="Brief summary of prior offences" /></label>
+            <label>{t("hunt.criminal_history")}<input value={fields.history} onChange={onField("history")} placeholder="Brief summary of prior offences" /></label>
             <label>
-              Enrollment photo *
+              {t("hunt.enrollment_photo")} *
               <input type="file" accept="image/*" onChange={(e) => setEnrollFile(e.target.files?.[0] ?? null)} required />
             </label>
-            <button disabled={enrollBusy} style={{ marginTop: 2 }}>{enrollBusy ? "Enrolling…" : "Enroll suspect"}</button>
+            <button disabled={enrollBusy} style={{ marginTop: 2 }}>{enrollBusy ? t("hunt.enrolling") : t("hunt.enroll_button")}</button>
             {enrollBusy && <p className="hint" role="status" style={{ marginTop: 8 }}>Building the face profile — usually 5–15 seconds.</p>}
           </form>
           {enrollStatus && (

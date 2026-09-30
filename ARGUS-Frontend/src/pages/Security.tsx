@@ -3,10 +3,12 @@ import PageHeader from "../components/PageHeader";
 import QrCode from "../components/QrCode";
 import RecoveryCodes from "../components/RecoveryCodes";
 import { mfaDisable, mfaEnable, mfaSetup, mfaStatus } from "../lib/api";
+import { useT } from "../i18n";
 
 type Status = { enabled: boolean; required: boolean; recovery_codes_left: number };
 
 export default function Security() {
+  const t = useT();
   const [status, setStatus] = useState<Status | null>(null);
   const [setup, setSetup] = useState<{ secret: string; uri: string } | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
@@ -29,7 +31,7 @@ export default function Security() {
 
   return (
     <main>
-      <PageHeader eyebrow="Account" title="Security">
+      <PageHeader eyebrow={t("security.eyebrow")} title={t("security.title")}>
         Protect your account with a second step at sign-in, using any authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password…).
       </PageHeader>
 

@@ -9,20 +9,29 @@ import { useAsync } from "../lib/useAsync";
 import { usePageTitle } from "../lib/usePageTitle";
 import { ApiError } from "../lib/api";
 import type { FingerprintMatchResult, FingerprintPrintType, FingerprintQualityCheck } from "../types";
+import { TKey, useT } from "../i18n";
 
 /** Same bands the API uses: 70+ High, 40-69 Medium, below that Low / insufficient. */
 function tierClass(label: string): string {
   return label.startsWith("High") ? "pill-high" : label.startsWith("Medium") ? "pill-medium" : "pill-low";
 }
 
+/** The API's band text ("High", "Medium", "Low / insufficient") shown in the UI language. */
+function bandLabel(label: string, t: (k: TKey) => string): string {
+  if (label.startsWith("High")) return t("fingerprint.confidence_high");
+  if (label.startsWith("Medium")) return t("fingerprint.confidence_medium");
+  return t("fingerprint.confidence_low");
+}
+
 function EngineBanner() {
+  const t = useT();
   const status = useAsync(fingerprintStatus);
   if (status.loading && !status.data) return <Skeleton rows={1} />;
   if (status.error) {
     return (
       <div className="panel-error" role="alert">
         <span>Couldn't check the fingerprint engine: {status.error}</span>
-        <button type="button" className="link-btn" onClick={status.reload}>Retry</button>
+        <button type="button" className="link-btn" onClick={status.reload}>{t("common.retry")}</button>
       </div>
     );
   }
@@ -31,12 +40,13 @@ function EngineBanner() {
   }
   return (
     <div className="panel-error" role="alert" style={{ marginBottom: 14 }}>
-      <span><strong>Fingerprint matching is not available on this deployment.</strong> {status.data.message}</span>
+      <span><strong>{t("fingerprint.status_unavailable")}</strong> {status.data.message}</span>
     </div>
   );
 }
 
 function MatchPanel() {
+  const t = useT();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [printType, setPrintType] = useState<FingerprintPrintType>("rolled");
@@ -75,8 +85,8 @@ function MatchPanel() {
   const q = result?.quality_check ?? refused;
   return (
     <section className="card">
-      <span className="section-label">01 · Match</span>
-      <h2>Match a latent or rolled print</h2>
+      <span className="section-label">01 · {t("fingerprint.match_panel")}</span>
+      <h2>{t("fingerprint.match_heading")}</h2>
       <form onSubmit={run}>
         <label className="hunt-dropzone" htmlFor="fp-match-input" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer" }}>
           {preview ? (
@@ -86,8 +96,8 @@ function MatchPanel() {
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
                 <path d="M12 3a6 6 0 0 0-6 6v3M12 7a2 2 0 0 0-2 2v6M12 11v6M16 9a4 4 0 0 0-8 0M16 13v3a6 6 0 0 1-2 4.5M8 14v1a6 6 0 0 0 1.5 4" />
               </svg>
-              <span style={{ fontWeight: 600, color: "var(--text-2)", fontSize: "0.875rem" }}>Click to upload a fingerprint image</span>
-              <span className="hint">JPEG, PNG, BMP or TIFF, up to 10 MB</span>
+              <span style={{ fontWeight: 600, color: "var(--text-2)", fontSize: "0.875rem" }}>{t("fingerprint.upload_prompt")}</span>
+              <span className="hint">{t("fingerprint.upload_hint")}</span>
             </>
           )}
           <input id="fp-match-input" type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
@@ -98,10 +108,10 @@ function MatchPanel() {
             <input type="radio" name="fp-type" checked={printType === "rolled"} onChange={() => setPrintType("rolled")} /> Rolled / plain print
           </label>
           <label style={{ display: "inline-flex", gap: 6 }}>
-            <input type="radio" name="fp-type" checked={printType === "latent"} onChange={() => setPrintType("latent")} /> Latent (crime-scene) print
+            <input type="radio" name="fp-type" checked={printType === "latent"} onChange={() => setPrintType("latent")} /> {t("fingerprint.latent_flag")}
           </label>
         </fieldset>
-        <button disabled={busy || !file} style={{ width: "100%", justifyContent: "center" }}>{busy ? "Matching…" : "Run match"}</button>
+        <button disabled={busy || !file} style={{ width: "100%", justifyContent: "center" }}>{busy ? t("fingerprint.matching") : t("fingerprint.run_match")}</button>
         {busy && <><p className="hint" role="status" style={{ marginTop: 8 }}>Extracting minutiae and comparing against enrolled prints — this can take up to a minute.</p><Skeleton rows={3} /></>}
       </form>
 
@@ -120,10 +130,10 @@ function MatchPanel() {
             <span className="hint">{q.method ? `Measured by ${q.method.replace(/\+/g, " + ")}` : "Quality reading"} — this is not an NFIQ score{q.valid_blocks !== undefined ? ` (${q.valid_blocks} clear ridge blocks)` : ""}.</span>
           </div>
 
-          {!q.passed && <div className="panel-error" role="alert">This print is too poor to search. Nothing was matched. Try a better impression or a clearer image.</div>}
+          {!q.passed && <div className="panel-error" role="alert">{t("fingerprint.quality_failed")} Nothing was matched. Try a better impression or a clearer image.</div>}
 
           {result && q.passed && !result.match_found && (
-            <div className="hunt-match-badge not-found"><p style={{ margin: 0, fontWeight: 600, color: "var(--text-3)" }}>No enrolled print scored above the match threshold</p></div>
+            <div className="hunt-match-badge not-found"><p style={{ margin: 0, fontWeight: 600, color: "var(--text-3)" }}>{t("fingerprint.no_match")}</p></div>
           )}
 
           {result?.match_found && (
@@ -135,10 +145,10 @@ function MatchPanel() {
                       <strong>#{c.rank} {c.name}</strong>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
                         {/* The raw SourceAFIS score is the number an examiner reads; the label is only a band over it. */}
-                        <span className="wsrs-bar-score" style={{ fontSize: "1.125rem" }} title="SourceAFIS raw score">
+                        <span className="wsrs-bar-score" style={{ fontSize: "1.125rem" }} title={t("fingerprint.score_label")}>
                           {c.score.toFixed(1)}
                         </span>
-                        <span className={`pill ${tierClass(c.confidence_label)}`}><span className="pill-dot" /> {c.confidence_label}</span>
+                        <span className={`pill ${tierClass(c.confidence_label)}`}><span className="pill-dot" /> {bandLabel(c.confidence_label, t)}</span>
                       </span>
                     </div>
                     <span className="hint">{c.fir_id} · SourceAFIS raw score {c.score.toFixed(1)}</span>
@@ -160,6 +170,7 @@ function MatchPanel() {
 }
 
 function EnrollPanel() {
+  const t = useT();
   const [fields, setFields] = useState({ name: "", fir_id: "" });
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -185,15 +196,15 @@ function EnrollPanel() {
 
   return (
     <section className="card">
-      <span className="section-label">02 · Enroll</span>
-      <h2>Add a fingerprint to the index</h2>
+      <span className="section-label">02 · {t("fingerprint.enroll_panel")}</span>
+      <h2>{t("fingerprint.enroll_heading")}</h2>
       <form onSubmit={run}>
         <div className="form-row">
-          <label>Name *<input value={fields.name} onChange={(e) => setFields((f) => ({ ...f, name: e.target.value }))} required maxLength={200} placeholder="Full name" /></label>
-          <label>FIR ID *<input value={fields.fir_id} onChange={(e) => setFields((f) => ({ ...f, fir_id: e.target.value }))} required maxLength={100} placeholder="FIR-2026-XXX" /></label>
+          <label>{t("fingerprint.name")} *<input value={fields.name} onChange={(e) => setFields((f) => ({ ...f, name: e.target.value }))} required maxLength={200} placeholder="Full name" /></label>
+          <label>{t("hunt.fir_id")} *<input value={fields.fir_id} onChange={(e) => setFields((f) => ({ ...f, fir_id: e.target.value }))} required maxLength={100} placeholder="FIR-2026-XXX" /></label>
         </div>
         <label>Fingerprint image *<input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required /></label>
-        <button disabled={busy || !file} style={{ marginTop: 2 }}>{busy ? "Enrolling…" : "Enroll"}</button>
+        <button disabled={busy || !file} style={{ marginTop: 2 }}>{busy ? t("fingerprint.enrolling") : t("fingerprint.enroll_button")}</button>
         {busy && <p className="hint" role="status" style={{ marginTop: 8 }}>Extracting minutiae and updating the index…</p>}
       </form>
       {status && <p className={status.ok ? "success-msg" : "error"} role={status.ok ? "status" : "alert"} style={{ marginTop: 10 }}>{status.text}</p>}
@@ -202,15 +213,16 @@ function EnrollPanel() {
 }
 
 export default function FingerprintHunt() {
-  usePageTitle("Fingerprint");
+  const t = useT();
+  usePageTitle(t("fingerprint.title"));
   const { user } = useAuth();
   const canEnroll = user?.role === "supervisor" || user?.role === "admin"; // the API enforces the same rule
   return (
     <main>
-      <PageHeader eyebrow="Biometric intelligence" title="Fingerprint Identification">
-        Minutiae matching of latent and rolled prints against enrolled prints in your jurisdiction. A match is an investigative lead: forensic lab confirmation is required.
+      <PageHeader eyebrow={t("fingerprint.eyebrow")} title={t("fingerprint.title")}>
+        {t("fingerprint.subtitle")}
       </PageHeader>
-      <LeadNotice />
+      <LeadNotice>{t("lead_notice.fingerprint")}</LeadNotice>
       <ErrorBoundary label="the engine status"><EngineBanner /></ErrorBoundary>
       <div className="grid-2">
         <ErrorBoundary label="the match panel"><MatchPanel /></ErrorBoundary>

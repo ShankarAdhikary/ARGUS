@@ -1,18 +1,21 @@
 import type { WsrsBreakdown as Breakdown } from "../types";
+import { TKey, useT } from "../i18n";
 
-const ORDER: { key: keyof Breakdown["factors"]; name: string }[] = [
-  { key: "recency", name: "Recency" },
-  { key: "repeat", name: "Repeat offences" },
-  { key: "escalation", name: "Escalation" },
-  { key: "network", name: "Network" },
-  { key: "geographic", name: "Geographic focus" },
+const ORDER: { key: keyof Breakdown["factors"]; name: TKey }[] = [
+  { key: "recency", name: "wsrs.factors.recency" },
+  { key: "repeat", name: "wsrs.factors.repeat" },
+  { key: "escalation", name: "wsrs.factors.escalation" },
+  { key: "network", name: "wsrs.factors.network" },
+  { key: "geographic", name: "wsrs.factors.geographic" },
 ];
 
 /** Horizontal bar per WSRS factor, with the reason for each score. */
 export default function WsrsBreakdown({ breakdown }: { breakdown: Breakdown }) {
+  const t = useT();
   return (
     <div className="wsrs-bars" role="list" aria-label="Women Safety Risk Score factors">
-      {ORDER.map(({ key, name }) => {
+      {ORDER.map(({ key, name: nameKey }) => {
+        const name = t(nameKey);
         const f = breakdown.factors[key];
         const weight = Math.round((breakdown.weights?.[key] ?? 0) * 100);
         return (
