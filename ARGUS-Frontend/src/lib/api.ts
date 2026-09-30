@@ -22,6 +22,10 @@ import type {
   FingerprintStatus,
   RiskForecastResponse,
   WsrsLeaderboardResponse,
+  VoiceprintStatus,
+  VoiceprintMatchResult,
+  VoiceprintEnrollResult,
+  ResolutionDecision,
   Role,
 } from "../types";
 
@@ -263,6 +267,41 @@ export function fingerprintEnroll(fields: { name: string; fir_id: string }, file
   return request<FingerprintEnrollResult>("/api/v1/biometric/fingerprint/enroll", { method: "POST", body: form });
 }
 
+/**
+ * Voice biometrics. The routes only exist when the deployment has switched the feature on (VOICEPRINT_ENABLED); until the
+ * evaluation has been run they answer 404. That is an expected state, not an error, so it maps to `available: false`.
+ */
+export async function voiceprintStatus(): Promise<VoiceprintStatus> {
+  try {
+    const s = await request<{ available: boolean; calibrated: boolean; enrolled: number; message: string | null; label: string }>("/api/v1/biometric/voice/status");
+    return { available: s.available, enabled: true, calibrated: s.calibrated, enrolled: s.enrolled, reason: s.message ?? undefined, label: s.label };
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return { available: false, enabled: false, calibrated: false, enrolled: 0,
+               reason: "Speaker identification is switched off on this deployment until it has been evaluated on real recordings." };
+    }
+    throw err;
+  }
+}
+
+export function voiceprintMatch(file: File, lawfulInterceptionRef: string, caseId?: string, justification?: string) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("lawful_interception_ref", lawfulInterceptionRef);
+  if (caseId) form.append("case_id", caseId);
+  if (justification) form.append("justification", justification);
+  return request<VoiceprintMatchResult>("/api/v1/biometric/voice/match", { method: "POST", body: form });
+}
+
+export function voiceprintEnroll(fields: { name: string; fir_id: string; lawful_interception_ref: string }, file: File) {
+  const form = new FormData();
+  form.append("name", fields.name);
+  form.append("fir_id", fields.fir_id);
+  form.append("lawful_interception_ref", fields.lawful_interception_ref);
+  form.append("file", file);
+  return request<VoiceprintEnrollResult>("/api/v1/biometric/voice/enroll", { method: "POST", body: form });
+}
+
 export function biometricBulkZip(file: File) {
   const form = new FormData();
   form.append("file", file);
@@ -383,8 +422,12 @@ export function personWsrs(person: string) {
   return request<{ person: string; wsrs: WsrsBreakdown | null }>(`/api/v1/analytics/wsrs?person_name=${encodeURIComponent(person)}`);
 }
 
-export function wsrsLeaderboard(limit = 5) {
-  return request<WsrsLeaderboardResponse>(`/api/v1/analytics/wsrs-leaderboard?limit=${limit}`);
+export function wsrsLeaderboard(options: number | { limit?: number; tier?: string; jurisdiction?: string } = 5) {
+  const o = typeof options === "number" ? { limit: options } : options;
+  const q = new URLSearchParams({ limit: String(o.limit ?? 50) });
+  if (o.tier) q.set("tier", o.tier);
+  if (o.jurisdiction) q.set("jurisdiction", o.jurisdiction);
+  return request<WsrsLeaderboardResponse>(`/api/v1/analytics/wsrs-leaderboard?${q}`);
 }
 
 export function hotspots(category = "WOMEN_SAFETY") {
@@ -410,8 +453,15 @@ export interface ResolveCandidate {
   candidate: string;
   similarity: number;
   match_type?: string;
+  /** Script-independent form of the candidate ("Ramesh", "रमेश" and "RAMESH" all give "ramesh"). */
+  canonical?: string;
   resolution?: string;
   suggested?: "merge" | "possible_match";
+  label?: string;
+}
+
+export function resolutionDecisions(limit = 10) {
+  return request<ResolutionDecision[]>(`/api/v1/resolve/decisions?limit=${limit}`);
 }
 
 export function resolveCheck(name: string) {

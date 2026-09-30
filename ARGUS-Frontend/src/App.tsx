@@ -7,6 +7,9 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 
 const FingerprintHunt = lazy(() => import("./pages/FingerprintHunt"));
+const VoiceprintHunt = lazy(() => import("./pages/VoiceprintHunt"));
+const WsrsLeaderboard = lazy(() => import("./pages/WsrsLeaderboard"));
+const EntityResolution = lazy(() => import("./pages/EntityResolution"));
 const Dashboard    = lazy(() => import("./pages/Dashboard"));
 const Search       = lazy(() => import("./pages/Search"));
 const EntityDetail = lazy(() => import("./pages/EntityDetail"));
@@ -56,6 +59,9 @@ function AppShell() {
             <Route path="/patterns/:id" element={<ProtectedRoute><PatternDetail /></ProtectedRoute>} />
             <Route path="/geo-risk" element={<ProtectedRoute><GeographicRisk /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+            <Route path="/analytics/wsrs" element={<ProtectedRoute roles={["supervisor", "admin"]}><WsrsLeaderboard /></ProtectedRoute>} />
+            <Route path="/biometric/voiceprint" element={<ProtectedRoute><VoiceprintHunt /></ProtectedRoute>} />
+            <Route path="/resolve" element={<ProtectedRoute><EntityResolution /></ProtectedRoute>} />
             <Route path="/biometric/fingerprint" element={<ProtectedRoute><FingerprintHunt /></ProtectedRoute>} />
             <Route path="/hunt" element={<ProtectedRoute><Hunt /></ProtectedRoute>} />
             <Route path="/ingestion" element={<ProtectedRoute><Ingestion /></ProtectedRoute>} />

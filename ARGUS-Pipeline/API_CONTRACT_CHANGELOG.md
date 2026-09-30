@@ -21,6 +21,9 @@ the application and regenerating this file in the same change.
 - Confirmed graph contract is `/api/v1/network/accused` and
   `/api/v1/network/phone`; no `/api/v1/graph/expand` endpoint exists in MVP v1.
 - Confirmed burner analytics returns `burners[].phone` and `burners[].calls`.
+- `GET /api/v1/analytics/wsrs-leaderboard` rows now also carry `fir_count`, `jurisdictions` and `computed_at`; the response has a top-level `computed_at`.
+- `POST /api/v1/resolve/check`, `POST /api/v1/resolve/decision` and `GET /api/v1/resolve/decisions` are now jurisdiction-scoped for scoped roles (candidates outside scope are not returned; an out-of-scope name in a decision answers 404; decision history shows the caller's own decisions only). `decisions` accepts `limit` (1-100).
+- New frontend pages: `/analytics/wsrs` (supervisor, admin), `/biometric/voiceprint`, `/resolve`.
 
 ## Known intentional MVP boundaries
 

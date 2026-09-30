@@ -1146,3 +1146,10 @@ mark.ent { background: transparent; }
 mark.ent.ent-person { background: var(--blue-bg); } mark.ent.ent-phone { background: var(--green-bg); }
 mark.ent.ent-location { background: var(--amber-bg); } mark.ent.ent-section { background: var(--red-bg); }
 button.danger { background: var(--red); border-color: var(--red); color: var(--bg); }
+
+/* ── Info + disclaimer banners, entity resolution ── */
+.info-banner { padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-accent); background: var(--accent-bg); color: var(--text); font-size: .875rem; line-height: 1.5; }
+.disclaimer-banner { margin: 14px 0 0; padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--red); background: var(--red-bg); color: var(--text); font-size: .8125rem; line-height: 1.5; }
+.resolve-card { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); }
+.resolve-card + .resolve-card { margin-top: 10px; }
+.resolve-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }

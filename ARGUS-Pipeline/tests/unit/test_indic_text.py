@@ -102,7 +102,7 @@ def test_resolve_check_matches_across_scripts(monkeypatch):
     driver.session.return_value.__enter__.return_value = session
     monkeypatch.setattr(pa, "_neo4j", driver)
     monkeypatch.setattr(pa, "log_action", MagicMock())
-    out = asyncio.run(pa.resolve_check("Ramesh", current_user={"full_name": "t"}))
+    out = asyncio.run(pa.resolve_check("Ramesh", current_user={"full_name": "t", "role": "admin", "jurisdiction": "National"}))
     assert out[0]["candidate"] == "रमेश"
     assert out[0]["match_type"] == "transliteration_match" and out[0]["similarity"] == 1.0
     assert all(c["candidate"] != "Suresh Patel" or c["similarity"] < 0.92 for c in out)

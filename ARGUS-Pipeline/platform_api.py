@@ -26,6 +26,7 @@ from rapidfuzz import fuzz
 
 from audit import log_action, verify_chain
 from indic_text import canonical_name
+from scoping import SUSPECT_IN_SCOPE, node_in_scope
 from wsrs import WS_NETWORKS, WS_TERMS
 from report_docx import build_case_docx
 from request_context import CROSS_JURISDICTION_ROLES
@@ -570,6 +571,9 @@ async def add_case_note(case_id: str, payload: CaseNoteRequest, current_user: di
 
 @router.get("/resolve/check")
 async def resolve_check(name: str, current_user: dict = Depends(get_current_user)):
+    # Candidates are limited to people (and phones) tied to a FIR in the caller's jurisdiction: fuzzy-matching against the whole
+    # graph would let a scoped officer enumerate other jurisdictions' suspects by typing near-misses of their names.
+    scope = search_scope(current_user)
     normalized = normalise_phone_identifier(name)
     if is_phone_identifier(name):
         with _neo4j.session() as session:
@@ -577,6 +581,8 @@ async def resolve_check(name: str, current_user: dict = Depends(get_current_user
                 "MATCH (p:Phone {id: $phone}) RETURN p.id AS value LIMIT 1",
                 phone=normalized,
             ).single()
+            if exact_phone and not node_in_scope(session, normalized, scope):
+                exact_phone = None
         if exact_phone:
             return [{
                 "candidate": exact_phone["value"],
@@ -587,7 +593,7 @@ async def resolve_check(name: str, current_user: dict = Depends(get_current_user
             }]
 
     with _neo4j.session() as session:
-        result = session.run("MATCH (s:Suspect) RETURN DISTINCT s.id AS name")
+        result = session.run(f"MATCH (s:Suspect) WHERE $scope IS NULL OR {SUSPECT_IN_SCOPE} RETURN DISTINCT s.id AS name", scope=scope)
         candidates = [row["name"] for row in result if row["name"]]
     scored = []
     # Names are compared on their script-independent canonical form first ("रमेश" == "Ramesh" == "RAMESH"), and on the
@@ -633,6 +639,13 @@ async def resolve_decision(payload: ResolutionDecisionRequest, current_user: dic
     """Human-in-the-loop confirmation (FR-03). Confirming links the two identities
     with a reversible ALIAS_OF edge; nothing is ever destructively merged."""
     linked = False
+    scope = search_scope(current_user)
+    if scope is not None:
+        # A scoped officer can only decide on names they can see; anything else answers like an unknown name.
+        with _neo4j.session() as session:
+            visible = node_in_scope(session, payload.name, scope) and node_in_scope(session, payload.candidate, scope)
+        if not visible:
+            raise HTTPException(status_code=404, detail="Unknown name.")
     if payload.decision == "confirm_merge":
         with _neo4j.session() as session:
             record = session.run(
@@ -665,9 +678,14 @@ async def resolve_decision(payload: ResolutionDecisionRequest, current_user: dic
 
 
 @router.get("/resolve/decisions")
-async def list_resolution_decisions(current_user: dict = Depends(get_current_user)):
+async def list_resolution_decisions(limit: int = Query(default=50, ge=1, le=100), current_user: dict = Depends(get_current_user)):
+    """Recent resolution decisions. Jurisdiction-scoped officers see only their own (the table records no jurisdiction)."""
+    own_only = search_scope(current_user) is not None
     with get_cursor() as cur:
-        cur.execute("SELECT * FROM resolution_decisions ORDER BY decided_at DESC LIMIT 50")
+        if own_only:
+            cur.execute("SELECT * FROM resolution_decisions WHERE decided_by = %s ORDER BY decided_at DESC LIMIT %s", (current_user["full_name"], limit))
+        else:
+            cur.execute("SELECT * FROM resolution_decisions ORDER BY decided_at DESC LIMIT %s", (limit,))
         rows = cur.fetchall()
     return [
         {

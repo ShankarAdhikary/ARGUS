@@ -79,6 +79,7 @@ const SECTIONS = [
     links: [
       { to: "/",        label: "Dashboard",       icon: Icons.dashboard, end: true },
       { to: "/search",  label: "Search",          icon: Icons.search },
+      { to: "/resolve", label: "Name Resolution", icon: Icons.search },
       { to: "/network", label: "Network Map",     icon: Icons.network },
       { to: "/cases",   label: "Cases",           icon: Icons.cases },
     ],
@@ -91,6 +92,13 @@ const SECTIONS = [
       { to: "/alerts",   label: "Alerts",         icon: Icons.alerts },
       { to: "/hunt",     label: "Biometric Hunt", icon: Icons.biometric },
       { to: "/biometric/fingerprint", label: "Fingerprint", icon: Icons.biometric },
+      { to: "/biometric/voiceprint", label: "Voiceprint", icon: Icons.biometric },
+    ],
+  },
+  {
+    label: "Analytics",
+    links: [
+      { to: "/analytics/wsrs", label: "High-Risk Suspects", icon: Icons.patterns, roles: ["supervisor", "admin"] },
     ],
   },
   {
