@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
 import LeadNotice from "../components/LeadNotice";
 import NetworkGraph from "../components/NetworkGraph";
+import SightingForm from "../components/SightingForm";
 import { addCaseEntity, API_BASE_URL, centrality, entityTypeGuess, getToken, listCases, logAudit, networkAccused, networkFinancial, networkPath, networkPhone } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { CaseSummary, CentralityRow, EntityType, GraphElements } from "../types";
@@ -14,6 +15,7 @@ interface SurveillanceSighting {
   zone: string;
   timestamp: string;
   confidence: number;
+  entered_by?: string | null;
 }
 
 export default function NetworkExplorer() {
@@ -33,10 +35,11 @@ export default function NetworkExplorer() {
   const [pathStart, setPathStart] = useState<string | null>(null);
   const [sightings, setSightings] = useState<SurveillanceSighting[]>([]);
   const [history, setHistory] = useState<string[]>([]);
+  const [logging, setLogging] = useState(false);
+  const [sightingsVersion, setSightingsVersion] = useState(0);
 
+  // Surveillance sightings: non-fatal, and re-read after the officer logs one.
   useEffect(() => {
-    listCases().then(setCases).catch(() => setCases([]));
-    // Surveillance sightings — non-fatal
     const token = getToken();
     fetch(`${API_BASE_URL}/api/v1/surveillance/sightings`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -44,6 +47,10 @@ export default function NetworkExplorer() {
       .then((r) => r.ok ? r.json() : [])
       .then((data: SurveillanceSighting[]) => setSightings(data.slice(0, 10)))
       .catch(() => {});
+  }, [sightingsVersion]);
+
+  useEffect(() => {
+    listCases().then(setCases).catch(() => setCases([]));
     const focus = params.get("focus");
     centrality()
       .then((rows) => {
@@ -340,9 +347,19 @@ export default function NetworkExplorer() {
             ))}
           </div>
 
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 20 }}>
+            <p className="section-label" style={{ margin: 0 }}>Camera sightings</p>
+            <button type="button" className="link-btn" aria-expanded={logging} onClick={() => setLogging((v) => !v)}>{t("network.log_sighting")}</button>
+          </div>
+          {logging && (
+            <SightingForm
+              initialSuspect={selected ?? ""}
+              onLogged={() => setSightingsVersion((n) => n + 1)}
+              onClose={() => setLogging(false)}
+            />
+          )}
           {sightings.length > 0 && (
             <>
-              <p className="section-label" style={{ marginTop: 20 }}>Camera sightings</p>
               <div className="ranked-list">
                 {sightings.map((s, i) => (
                   <button
@@ -354,7 +371,9 @@ export default function NetworkExplorer() {
                   >
                     <span style={{ gridColumn: "1/3", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.suspect}</span>
                     <span className="hint" style={{ gridColumn: "1/2", fontSize: "0.75rem" }}>{s.zone}</span>
-                    <span style={{ fontSize: "0.75rem", color: s.confidence > 0.8 ? "var(--green)" : "var(--amber)" }}>{Math.round(s.confidence * 100)}%</span>
+                    {s.entered_by
+                      ? <span className="hint" style={{ fontSize: "0.75rem" }} title={s.entered_by}>manual</span>
+                      : <span style={{ fontSize: "0.75rem", color: s.confidence > 0.8 ? "var(--green)" : "var(--amber)" }}>{Math.round(s.confidence * 100)}%</span>}
                   </button>
                 ))}
               </div>
