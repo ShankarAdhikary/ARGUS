@@ -1,3 +1,13 @@
+# --- Stage 1: SourceAFIS (Java, Apache-2.0) and its transitive jars, resolved by Maven from Maven Central ---------------
+# Every jar is pinned by SHA-256 in vendor/sourceafis/jars.sha256; the build fails if anything differs, so a compromised
+# or changed artifact cannot slip into the image. To upgrade: edit vendor/sourceafis/pom.xml, rebuild, refresh the hashes.
+FROM maven:3.9-eclipse-temurin-17 AS sourceafis-jars
+WORKDIR /w
+COPY vendor/sourceafis/pom.xml vendor/sourceafis/jars.sha256 ./
+RUN mvn -q -B dependency:copy-dependencies -DoutputDirectory=/out -DincludeScope=runtime \
+ && cd /out && sha256sum -c /w/jars.sha256 && [ "$(ls -1 /out | wc -l)" = "$(wc -l < /w/jars.sha256)" ]
+
+# --- Stage 2: the application image ---------------------------------------------------------------------------------
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -38,6 +48,16 @@ RUN --mount=type=cache,target=/root/.cache/pip \
       mkdir -p "$WHISPER_CACHE_DIR" && \
       python -c "import whisper; whisper.load_model('${WHISPER_MODEL}', download_root='${WHISPER_CACHE_DIR}')"; \
     fi
+
+# Fingerprint matching: the SourceAFIS Java library, bridged to Python with JPype. Needs a JRE (headless, ~190 MB).
+# The base image is Debian 13 (trixie), which no longer packages OpenJDK 17; 21 is fine (SourceAFIS needs Java 8+).
+# Opt out of the JVM with: docker compose build --build-arg INSTALL_JVM=false api   (fingerprint matching then answers 501)
+ARG INSTALL_JVM=true
+RUN if [ "$INSTALL_JVM" = "true" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends openjdk-21-jre-headless && rm -rf /var/lib/apt/lists/*; \
+    fi
+COPY --from=sourceafis-jars /out /opt/sourceafis
+ENV SOURCEAFIS_JAR_DIR=/opt/sourceafis
 
 COPY . ./
 RUN mkdir -p /app/uploads

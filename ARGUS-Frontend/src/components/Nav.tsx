@@ -90,6 +90,7 @@ const SECTIONS = [
       { to: "/geo-risk", label: "Geographic Risk", icon: Icons.network },
       { to: "/alerts",   label: "Alerts",         icon: Icons.alerts },
       { to: "/hunt",     label: "Biometric Hunt", icon: Icons.biometric },
+      { to: "/biometric/fingerprint", label: "Fingerprint", icon: Icons.biometric },
     ],
   },
   {

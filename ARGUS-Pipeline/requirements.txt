@@ -22,3 +22,6 @@ scipy>=1.14,<2
 cryptography>=42,<46
 python-docx>=1.1,<2
 indic-transliteration>=2.3,<3
+# Fingerprint matching: JPype bridges to the SourceAFIS Java library (jars + JRE come from the Dockerfile).
+# SourceAFIS has no PyPI package, so `pip install sourceafis` does not exist; do not add it.
+jpype1>=1.5,<2

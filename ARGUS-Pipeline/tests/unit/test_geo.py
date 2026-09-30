@@ -1,9 +1,6 @@
 """Phase 4: geocoder, KDE hotspots, risk diffusion and their endpoints."""
 
-import importlib
 import random
-import sys
-from contextlib import contextmanager
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,28 +12,7 @@ import platform_api as pa
 from tests.unit.test_platform_critical_path import _auth_headers
 
 
-_REAL: dict = {}   # numpy's C extension cannot be imported twice in one process, so keep the real modules once loaded
-_is_lib = lambda k: k.split(".")[0] in ("scipy", "numpy")
-
-
-@contextmanager
-def real_scipy():
-    """conftest stubs numpy and scipy for the whole suite; swap the real ones in for the KDE tests, skip if not installed."""
-    saved = {k: sys.modules.pop(k) for k in list(sys.modules) if _is_lib(k)}
-    try:
-        if _REAL:
-            sys.modules.update(_REAL)
-        else:
-            try:
-                importlib.import_module("scipy.stats")
-            except ImportError:
-                pytest.skip("scipy not installed")
-            _REAL.update({k: v for k, v in sys.modules.items() if _is_lib(k)})
-        yield
-    finally:
-        for k in [k for k in sys.modules if _is_lib(k)]:
-            sys.modules.pop(k)
-        sys.modules.update(saved)
+from tests.unit.real_libs import real_libs as real_scipy
 
 
 def test_geocode_station_district_and_text():

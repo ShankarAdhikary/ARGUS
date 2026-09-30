@@ -58,6 +58,10 @@ services:
       SECRETS_DIR: /vault/secrets
       ENABLE_INDIC_NER: ${ENABLE_INDIC_NER:-true}
       ENABLE_VOICE: ${ENABLE_VOICE:-true}
+      # Fingerprint engine, swappable from .env (fingerprint:JvmSourceAFISEngine = SourceAFIS through a JVM bridge).
+      FINGERPRINT_ENGINE: ${FINGERPRINT_ENGINE:-}
+      FINGERPRINT_DPI: ${FINGERPRINT_DPI:-500}
+      FINGERPRINT_MATCH_THRESHOLD: ${FINGERPRINT_MATCH_THRESHOLD:-40}
       # Match TensorFlow/BLAS threads to the CPU quota; the host reports 12 cores, so the default over-subscribes and throttles ~4x.
       OMP_NUM_THREADS: "4"
       TF_NUM_INTRAOP_THREADS: "4"

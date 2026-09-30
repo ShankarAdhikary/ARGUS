@@ -6,6 +6,7 @@ import { AuthProvider, ProtectedRoute, useAuth } from "./lib/auth";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 
+const FingerprintHunt = lazy(() => import("./pages/FingerprintHunt"));
 const Dashboard    = lazy(() => import("./pages/Dashboard"));
 const Search       = lazy(() => import("./pages/Search"));
 const EntityDetail = lazy(() => import("./pages/EntityDetail"));
@@ -55,6 +56,7 @@ function AppShell() {
             <Route path="/patterns/:id" element={<ProtectedRoute><PatternDetail /></ProtectedRoute>} />
             <Route path="/geo-risk" element={<ProtectedRoute><GeographicRisk /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+            <Route path="/biometric/fingerprint" element={<ProtectedRoute><FingerprintHunt /></ProtectedRoute>} />
             <Route path="/hunt" element={<ProtectedRoute><Hunt /></ProtectedRoute>} />
             <Route path="/ingestion" element={<ProtectedRoute><Ingestion /></ProtectedRoute>} />
             <Route path="/security" element={<ProtectedRoute><Security /></ProtectedRoute>} />

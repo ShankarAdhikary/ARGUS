@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from config import (
     BUCKET_NAME,
     CORS_ORIGINS,
+    JWT_SECRET,
     MAX_REQUEST_BYTES,
     assert_production_safe,
     ELASTICSEARCH_URL,
@@ -45,6 +46,7 @@ from config import (
     VOICE_MAX_BYTES,
 )
 import evidence
+import fingerprint
 from scoping import SUSPECT_IN_SCOPE, node_in_scope, path_in_scope
 import geo_risk
 import voice
@@ -162,6 +164,11 @@ except Exception:
 
 embedding_dimension = 512
 face_index = FaceIndex(embedding_dimension, os.getenv("FACE_INDEX_DIR", "uploads/face_index"))
+# Fingerprints: an independent index in its own MinIO bucket ("fingerprint-index"); the comparison engine is pluggable
+# (see fingerprint.py: SourceAFIS has no PyPI package, so the default engine reports "not installed").
+fingerprint_index = fingerprint.FingerprintIndex(
+    fingerprint.MinioStore(minio_client), key=fingerprint.derive_key(JWT_SECRET), lock=fingerprint.redis_lock(redis_client),
+)
 
 
 def _warm_face_models() -> None:
@@ -1067,6 +1074,169 @@ async def unified_enroll(
     
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+# ---------------------------------------------------------------------------
+# Fingerprint identification (latent and rolled prints)
+# ---------------------------------------------------------------------------
+
+_FP_MAX_IMAGE_BYTES = 10 * 1024 * 1024
+_FP_IMAGE_MAGIC = (b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n", b"BM", b"II*\x00", b"MM\x00*")   # JPEG PNG BMP TIFF
+
+
+def _fp_check_image(data: bytes) -> None:
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(data) > _FP_MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail=f"Image is larger than {_FP_MAX_IMAGE_BYTES // (1024 * 1024)} MB.")
+    if not data.startswith(_FP_IMAGE_MAGIC):
+        raise HTTPException(status_code=415, detail="Upload a JPEG, PNG, BMP or TIFF fingerprint image.")
+
+
+def _fp_unavailable(exc: NotImplementedError) -> HTTPException:
+    return HTTPException(status_code=501, detail=str(exc) or fingerprint.UNAVAILABLE_MESSAGE)
+
+
+def _fp_integrity(exc: Exception) -> HTTPException:
+    logger.error("fingerprint index integrity failure: %s", exc)
+    return HTTPException(status_code=503, detail="The fingerprint index failed its integrity check. Contact your system administrator.")
+
+
+@app.get("/api/v1/biometric/fingerprint/status")
+async def fingerprint_status(current_user: dict = Depends(get_current_user)):
+    """Whether a matching engine is installed, so the UI can say so before someone uploads a print."""
+    scope = search_scope(current_user)
+    try:
+        enrolled = await asyncio.to_thread(fingerprint_index.count, scope)
+    except fingerprint.IndexIntegrityError as exc:
+        raise _fp_integrity(exc) from exc
+    engine = fingerprint_index.engine_status()
+    return {"engine": fingerprint_index.engine.name, "available": engine["available"], "match_threshold": fingerprint_index.threshold,
+            "enrolled": enrolled, "message": engine["message"]}
+
+
+def _fp_fir_jurisdiction(fir_id: str) -> str:
+    with neo4j_driver.session() as session:
+        row = session.run("MATCH (f:FIR {id: $id}) RETURN f.jurisdiction AS j", id=fir_id).single()
+    return (row["j"] if row and row["j"] else UNASSIGNED)
+
+
+@app.post("/api/v1/biometric/fingerprint/enroll")
+async def fingerprint_enroll(
+    name: str = Form(..., min_length=1, max_length=200),
+    fir_id: str = Form(..., min_length=1, max_length=100),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_role("supervisor", "admin")),
+):
+    """Enrol a fingerprint. Supervisor and admin only: a fingerprint is stronger identifying data than a face photo."""
+    data = await file.read(_FP_MAX_IMAGE_BYTES + 1)
+    _fp_check_image(data)
+    try:
+        jurisdiction = await asyncio.to_thread(_fp_fir_jurisdiction, fir_id)
+        enrolled, errors = await asyncio.to_thread(
+            fingerprint_index.enroll_batch, [{"name": name, "fir_id": fir_id, "image": data, "jurisdiction": jurisdiction}])
+    except NotImplementedError as exc:
+        raise _fp_unavailable(exc) from exc
+    except fingerprint.IndexIntegrityError as exc:
+        raise _fp_integrity(exc) from exc
+    if errors:
+        err = errors[0]
+        raise HTTPException(status_code=422, detail={"quality_too_low": bool(err.get("quality_too_low")), "quality_score": err.get("quality_score"),
+                                                      "nfiq_score": None, "quality_check": err.get("quality"), "message": err["error"]})
+    rec = enrolled[0]
+    log_action(current_user, action="fingerprint_enroll", resource=f"fir:{fir_id[:100]}",
+               extra={"suspect_id": rec["suspect_id"], "image_sha256": hashlib.sha256(data).hexdigest(), "jurisdiction": jurisdiction})
+    return {**rec, "message": fingerprint.LEAD_LABEL}
+
+
+@app.post("/api/v1/biometric/fingerprint/match")
+async def fingerprint_match(
+    file: UploadFile = File(...),
+    print_type: str = Form(default="rolled", pattern="^(rolled|latent)$"),
+    case_id: str | None = Form(default=None),
+    justification: str | None = Form(default=None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Match a latent or rolled print against enrolled prints in the caller's jurisdiction. A lead, not an identification."""
+    data = await file.read(_FP_MAX_IMAGE_BYTES + 1)
+    _fp_check_image(data)
+    if case_id:
+        await asyncio.to_thread(_authorize_case, case_id, justification, current_user)
+    scope = search_scope(current_user)
+    try:
+        outcome = await asyncio.to_thread(fingerprint_index.match, data, 5, scope)
+    except NotImplementedError as exc:
+        raise _fp_unavailable(exc) from exc
+    except fingerprint.IndexIntegrityError as exc:
+        raise _fp_integrity(exc) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_safe_detail(exc)) from exc
+    quality = {k: outcome["quality"].get(k) for k in ("passed", "quality_score", "nfiq_score", "method", "minutiae", "minimum_minutiae", "valid_blocks", "ink_blocks")}
+    if outcome["quality_too_low"]:
+        # Refused before any matching: the print is too poor to search. nfiq_score stays null (no NFIQ is computed).
+        log_action(current_user, action="fingerprint_match", resource=f"case:{case_id}" if case_id else "fingerprint:probe", justification=justification,
+                   extra={"probe_sha256": hashlib.sha256(data).hexdigest(), "jurisdiction_filter": scope, "quality_passed": False,
+                          "quality_score": quality["quality_score"], "match_found": False})
+        raise HTTPException(status_code=422, detail={"quality_too_low": True, "quality_score": quality["quality_score"], "nfiq_score": None,
+                                                      "quality_check": quality, "message": outcome.get("message") or "Print quality too low to search."})
+    candidates = [
+        {"rank": h["rank"], "name": h["name"], "fir_id": h["fir_id"], "score": h["score"], "confidence_label": fingerprint.confidence_label(h["score"], print_type)}
+        for h in outcome["hits"] if h["score"] >= fingerprint_index.threshold
+    ]
+    log_action(current_user, action="fingerprint_match", resource=f"case:{case_id}" if case_id else "fingerprint:probe", justification=justification,
+               extra={"probe_sha256": hashlib.sha256(data).hexdigest(), "jurisdiction_filter": scope, "quality_passed": quality["passed"], "print_type": print_type,
+                      "match_found": bool(candidates), "top_candidate": candidates[0]["name"] if candidates else None,
+                      "top_score": candidates[0]["score"] if candidates else None})
+    return {"match_found": bool(candidates), "print_type": print_type, "quality_check": quality, "quality_too_low": False,
+            "candidates": candidates, "disclaimer": fingerprint.DISCLAIMER}
+
+
+@app.post("/api/v1/biometric/fingerprint/bulk-enroll-zip")
+async def fingerprint_bulk_enroll_zip(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_role("supervisor", "admin")),
+):
+    """Enrol many prints from a ZIP of '{name}__{fir_id}.jpg' files (single underscores in a name become spaces)."""
+    content = await file.read(_MAX_ZIP_UNCOMPRESSED_MB * 1024 * 1024 + 1)
+    items, errors = [], []
+    try:
+        with zipfile.ZipFile(BytesIO(content)) as archive:
+            members = [m for m in archive.infolist() if not m.is_dir()]
+            if len(members) > _MAX_ZIP_MEMBERS:
+                raise HTTPException(status_code=400, detail=f"ZIP contains too many files (>{_MAX_ZIP_MEMBERS}).")
+            if sum(m.file_size for m in members) > _MAX_ZIP_UNCOMPRESSED_MB * 1024 * 1024:
+                raise HTTPException(status_code=400, detail=f"ZIP uncompressed size exceeds {_MAX_ZIP_UNCOMPRESSED_MB} MB limit.")
+            jurisdictions: dict[str, str] = {}
+            for member in members:
+                parsed = fingerprint.parse_zip_member_name(member.filename)
+                if member.filename.startswith("__MACOSX") or os.path.basename(member.filename).startswith("."):
+                    continue
+                if not parsed:
+                    errors.append({"file": member.filename, "error": "Name must look like {name}__{fir_id}.jpg"})
+                    continue
+                if member.file_size > _FP_MAX_IMAGE_BYTES:
+                    errors.append({"file": member.filename, "error": "Image larger than 10 MB"})
+                    continue
+                data = archive.read(member)   # in memory: nothing is extracted to disk, so there is no zip-slip
+                if not data.startswith(_FP_IMAGE_MAGIC):
+                    errors.append({"file": member.filename, "error": "Not a supported image"})
+                    continue
+                name, fir_id = parsed
+                if fir_id not in jurisdictions:
+                    jurisdictions[fir_id] = await asyncio.to_thread(_fp_fir_jurisdiction, fir_id)
+                items.append({"name": name, "fir_id": fir_id, "image": data, "jurisdiction": jurisdictions[fir_id], "label": member.filename})
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(status_code=400, detail="Not a valid ZIP file.") from exc
+    try:
+        enrolled, failed = await asyncio.to_thread(fingerprint_index.enroll_batch, items) if items else ([], [])
+    except NotImplementedError as exc:
+        raise _fp_unavailable(exc) from exc
+    except fingerprint.IndexIntegrityError as exc:
+        raise _fp_integrity(exc) from exc
+    errors.extend({"file": f["file"], "error": f["error"]} for f in failed)
+    log_action(current_user, action="fingerprint_bulk_enroll", resource="fingerprint:zip",
+               extra={"enrolled": len(enrolled), "failed": len(errors), "zip_sha256": hashlib.sha256(content).hexdigest()})
+    return {"enrolled": len(enrolled), "failed": len(errors), "errors": errors[:50], "message": fingerprint.LEAD_LABEL}
+
 
 @app.delete("/api/v1/target/delete-by-fir")
 async def delete_record_by_fir(
