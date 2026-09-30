@@ -135,6 +135,6 @@ model, the audio pipeline or the channel mix changes.
 
 ## 10. Deliberately not built
 
-A UI (nothing should be presented to officers before the evaluation), an authorization-register integration, anti-spoofing,
+An officer UI that *works* before the evaluation: the page `/biometric/voiceprint` exists, but while the endpoints are off (404) it shows a "switched off" banner with the forms disabled, and once on it shows ranking-only results with the expert-confirmation label. An authorization-register integration, anti-spoofing,
 diarisation (separating several speakers in one recording: an enrolment or match clip must contain one speaker), and language
 identification.

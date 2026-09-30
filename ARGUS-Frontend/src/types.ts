@@ -167,8 +167,20 @@ export interface WsrsBreakdown {
   label: string;
 }
 
+export interface WsrsLeaderboardRow {
+  suspect: string;
+  score: number;
+  tier: WsrsTier;
+  wsrs: WsrsBreakdown;
+  /** All FIRs linked to this person, in any jurisdiction (wsrs.ws_fir_count is the women-safety subset). */
+  fir_count: number;
+  jurisdictions: string[];
+  computed_at: string | null;
+}
+
 export interface WsrsLeaderboardResponse {
-  suspects: { suspect: string; score: number; tier: WsrsTier; wsrs: WsrsBreakdown }[];
+  suspects: WsrsLeaderboardRow[];
+  computed_at: string | null;
   label: string;
 }
 
@@ -283,4 +295,57 @@ export interface FingerprintStatus {
   match_threshold: number;
   enrolled: number;
   message: string | null;
+}
+
+/** Voice biometrics. `available: false` covers both "switched off" (the API answers 404) and "engine not ready". */
+export interface VoiceprintStatus {
+  available: boolean;
+  enabled: boolean;
+  calibrated: boolean;
+  enrolled: number;
+  reason?: string;
+  label?: string;
+}
+
+export interface VoiceprintQuality {
+  passed: boolean;
+  duration_seconds?: number;
+  net_speech_seconds?: number;
+  snr_db?: number;
+  bandwidth_hz?: number;
+  narrowband?: boolean;
+  quality_score?: number;
+}
+
+export interface VoiceprintMatchResult {
+  /** null = no decision threshold has been measured yet (ranking only): never present it as a match or a non-match. */
+  match_found: boolean | null;
+  calibrated: boolean;
+  quality_check: VoiceprintQuality;
+  candidates: Array<{ rank: number; name: string; fir_id: string; jurisdiction?: string; score: number; confidence_label: string }>;
+  lawful_interception_ref: string;
+  note: string | null;
+  label: string;
+}
+
+export interface VoiceprintEnrollResult {
+  suspect_id: string;
+  name: string;
+  fir_id: string;
+  lawful_interception_ref: string;
+  duration_seconds: number;
+  net_speech_seconds: number;
+  channel_quality_score: number;
+  label: string;
+}
+
+export interface ResolutionDecision {
+  decision_id: string;
+  name: string;
+  candidate: string;
+  similarity: number | null;
+  decision: "confirm_merge" | "reject";
+  decided_by: string;
+  note: string | null;
+  decided_at: string;
 }

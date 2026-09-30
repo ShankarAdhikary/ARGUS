@@ -61,7 +61,10 @@ async def wsrs_leaderboard(
                 """
                 MATCH (s:Suspect) WHERE s.wsrs_score IS NOT NULL AND ($tier IS NULL OR s.wsrs_tier = $tier)
                   AND ($scope IS NULL OR EXISTS { (s)-[:LINKED_TO_FIR]->(:FIR {jurisdiction: $scope}) })
-                RETURN s.id AS suspect, s.wsrs_score AS score, s.wsrs_tier AS tier, s.wsrs_breakdown AS breakdown
+                OPTIONAL MATCH (s)-[:LINKED_TO_FIR]->(f:FIR)
+                WITH s, count(DISTINCT f) AS fir_count, collect(DISTINCT f.jurisdiction) AS jurisdictions
+                RETURN s.id AS suspect, s.wsrs_score AS score, s.wsrs_tier AS tier, s.wsrs_breakdown AS breakdown,
+                       s.wsrs_updated AS updated, fir_count, jurisdictions
                 ORDER BY s.wsrs_score DESC LIMIT $limit
                 """,
                 scope=scope, tier=tier, limit=limit,
@@ -73,7 +76,13 @@ async def wsrs_leaderboard(
     return {
         "status": "success",
         "jurisdiction": scope,
-        "suspects": [{"suspect": r["suspect"], "score": r["score"], "tier": r["tier"], "wsrs": json.loads(r["breakdown"])} for r in rows],
+        "suspects": [
+            {"suspect": r["suspect"], "score": r["score"], "tier": r["tier"], "wsrs": json.loads(r["breakdown"]),
+             "fir_count": r.get("fir_count", 0), "jurisdictions": sorted(j for j in (r.get("jurisdictions") or []) if j),
+             "computed_at": str(r["updated"]) if r.get("updated") else None}
+            for r in rows
+        ],
+        "computed_at": max((str(r["updated"]) for r in rows if r.get("updated")), default=None),
         "label": wsrs.LEAD_LABEL,
     }
 
