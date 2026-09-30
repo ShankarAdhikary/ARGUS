@@ -186,9 +186,11 @@ def redis_lock(client, name: str = "argus:fingerprint-index") -> Callable[[], Co
     return lambda: client.lock(name, timeout=120, blocking_timeout=60)
 
 
-def derive_key(secret: str) -> bytes:
-    """Purpose-specific HMAC key derived from an existing Vault-managed secret (no new secret to distribute)."""
-    return hmac.new(secret.encode(), b"argus-fingerprint-index-v1", hashlib.sha256).digest()
+def derive_key(secret: str, purpose: bytes = b"argus-fingerprint-index-v1") -> bytes:
+    """Purpose-specific HMAC key derived from an existing Vault-managed secret (no new secret to distribute).
+
+    Each index uses its own `purpose`, so a sealed document cannot be moved from one bucket into another and still verify."""
+    return hmac.new(secret.encode(), purpose, hashlib.sha256).digest()
 
 
 def _now() -> str:

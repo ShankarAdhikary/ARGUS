@@ -162,3 +162,8 @@ ENABLE_VOICE = os.getenv("ENABLE_VOICE", "true").lower() == "true"
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
 WHISPER_CACHE_DIR = os.getenv("WHISPER_CACHE_DIR", "/opt/whisper-cache")
 VOICE_MAX_BYTES = int(os.getenv("VOICE_MAX_BYTES", str(25 * 1024 * 1024)))
+
+# Voice biometrics (speaker identification). Off until scripts/evaluate_voiceprint.py has been run on real recordings:
+# the endpoints are not registered at all while this is false. See docs/voice-biometrics-design.md.
+VOICEPRINT_ENABLED = os.getenv("VOICEPRINT_ENABLED", "false").lower() == "true"
+VOICEPRINT_CALIBRATION_FILE = os.getenv("VOICEPRINT_CALIBRATION_FILE", "uploads/voiceprint-calibration.json")
