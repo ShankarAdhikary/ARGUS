@@ -8,7 +8,7 @@ RUN mvn -q -B dependency:copy-dependencies -DoutputDirectory=/out -DincludeScope
  && cd /out && sha256sum -c /w/jars.sha256 && [ "$(ls -1 /out | wc -l)" = "$(wc -l < /w/jars.sha256)" ]
 
 # --- Stage 2: the application image ---------------------------------------------------------------------------------
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
