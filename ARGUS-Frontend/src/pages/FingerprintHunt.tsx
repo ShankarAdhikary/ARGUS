@@ -127,17 +127,29 @@ function MatchPanel() {
           )}
 
           {result?.match_found && (
-            <ol className="geo-forecast-list" aria-label="Candidate matches">
-              {result.candidates.map((c) => (
-                <li key={`${c.rank}-${c.fir_id}`}>
-                  <div className="wsrs-bar-head">
-                    <strong>#{c.rank} {c.name}</strong>
-                    <span className={`pill ${tierClass(c.confidence_label)}`}><span className="pill-dot" /> {c.confidence_label} · {c.score}</span>
-                  </div>
-                  <span className="hint">{c.fir_id}</span>
-                </li>
-              ))}
-            </ol>
+            <>
+              <ol className="geo-forecast-list" aria-label="Candidate matches">
+                {result.candidates.map((c) => (
+                  <li key={`${c.rank}-${c.fir_id}`}>
+                    <div className="wsrs-bar-head">
+                      <strong>#{c.rank} {c.name}</strong>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                        {/* The raw SourceAFIS score is the number an examiner reads; the label is only a band over it. */}
+                        <span className="wsrs-bar-score" style={{ fontSize: "1.125rem" }} title="SourceAFIS raw score">
+                          {c.score.toFixed(1)}
+                        </span>
+                        <span className={`pill ${tierClass(c.confidence_label)}`}><span className="pill-dot" /> {c.confidence_label}</span>
+                      </span>
+                    </div>
+                    <span className="hint">{c.fir_id} · SourceAFIS raw score {c.score.toFixed(1)}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="hint" style={{ marginTop: 8 }}>
+                Scores are raw SourceAFIS values, not percentages: they can exceed 100, and 40 is the match threshold. Bands: 70+ High, 40–69 Medium.
+                They are not comparable with scores from other AFIS products.
+              </p>
+            </>
           )}
 
           {result && <p className="lead-notice" role="note" style={{ marginTop: 12 }}>{result.disclaimer}</p>}
