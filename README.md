@@ -33,8 +33,10 @@ python3 ARGUS-Pipeline/scripts/init_env.py
 #    Optional: add GROQ_API_KEY or GEMINI_API_KEY to it for better text extraction
 #    (without one, extraction falls back to simple pattern matching).
 
-# 2. Start the backend stack (API, worker, Postgres, Neo4j, Elasticsearch, MinIO, Redis)
-docker compose up -d --build
+# 2. Build the web app (nginx serves it) and start the stack (nginx, API, worker, Vault, Postgres/PostGIS, Neo4j,
+#    Elasticsearch, MinIO, Redis). The first start initialises Vault and prints VAULT_UNSEAL_KEY - copy it into .env.
+(cd ARGUS-Frontend && npm install && npm run build)
+python ARGUS-Pipeline/scripts/preflight.py && docker compose up -d --build
 
 # 3. Load the demo dataset (idempotent; see the script headers for details)
 docker compose exec api python generate_demo_dataset.py
@@ -48,8 +50,10 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173**. The API runs on http://localhost:8000 (interactive docs at `/docs`).
-The web app is not part of Docker Compose; it runs with Vite during development.
+Open **https://localhost** (self-signed certificate in development: accept the browser warning). nginx terminates TLS,
+serves the built web app and proxies `/api`, `/health` and `/docs` to the API, which is not published on the host.
+For hot reload use `npm run dev` (http://localhost:5173, API at https://localhost). To reach the Neo4j browser or MinIO
+console locally, add `-f docker-compose.debug.yml`; that override is refused when `ARGUS_ENV=production`.
 
 ## Demo credentials
 

@@ -141,3 +141,107 @@ export interface GraphElements {
 }
 
 export type ApiRecord = Record<string, unknown>;
+
+export interface RepeatVictimsResponse {
+  repeat_victim_count: number;
+  offense_categories: { category: string; victims: number }[];
+  explanation: string;
+  label: string;
+}
+
+export type WsrsTier = "HIGH" | "MEDIUM" | "LOW";
+
+export interface WsrsFactor {
+  score: number;
+  label: string;
+}
+
+export interface WsrsBreakdown {
+  total: number;
+  tier: WsrsTier;
+  factors: Record<"recency" | "repeat" | "escalation" | "network" | "geographic", WsrsFactor>;
+  weights?: Record<string, number>;
+  ws_fir_count: number;
+  confidence: number;
+  explanation: string;
+  label: string;
+}
+
+export interface WsrsLeaderboardResponse {
+  suspects: { suspect: string; score: number; tier: WsrsTier; wsrs: WsrsBreakdown }[];
+  label: string;
+}
+
+export interface HotspotCollection {
+  type: "FeatureCollection";
+  features: {
+    type: "Feature";
+    properties: { level: "high" | "medium" | "low"; cells: number };
+    geometry: GeoJSON.MultiPolygon;
+  }[];
+  properties: { category: string | null; points: number; reason?: string; explanation?: string; confidence?: number; label: string };
+}
+
+export interface RiskForecastRow {
+  jurisdiction: string;
+  score: number;
+  baseline_risk: number;
+  projected_risk: number;
+  shared_suspects: number;
+  geographic_neighbour: boolean | null;
+  explanation: string;
+}
+
+export interface RiskForecastResponse {
+  jurisdiction: string;
+  source_risk: number;
+  forecast: RiskForecastRow[];
+  method: string;
+  confidence: number;
+  label: string;
+}
+
+export interface LedgerEntry {
+  ledger_id: string;
+  file_id: string;
+  file_name: string | null;
+  file_sha256: string;
+  uploaded_by: string;
+  uploaded_at: string;
+  size_bytes: number | null;
+  row_hash: string;
+  row_ok: boolean | null;
+}
+
+export interface LedgerResponse {
+  entries: LedgerEntry[];
+  chain: { valid: boolean; checked: number; first_break: { ledger_id: string; reason: string } | null };
+}
+
+export interface EvidenceVerification {
+  intact: boolean;
+  stored_hash: string;
+  computed_hash: string | null;
+  delta_message: string;
+  chain_valid: boolean;
+}
+
+export interface VoiceEntity {
+  type: string;
+  value: string;
+  confidence: number;
+  evidence: string;
+  canonical?: string | null;
+}
+
+export interface VoiceResult {
+  transcript: string;
+  language: string | null;
+  entities: VoiceEntity[];
+  suggested_fir_fields: {
+    fields: { accused: string | null; mobile: string | null; location: string | null; station: string | null; date: string | null; sections: string[]; description: string };
+    confidence: Record<string, number>;
+    label: string;
+  };
+  message: string;
+}

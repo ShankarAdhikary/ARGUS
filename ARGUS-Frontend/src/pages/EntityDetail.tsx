@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
 import LeadNotice from "../components/LeadNotice";
 import NetworkGraph from "../components/NetworkGraph";
+import WsrsProfile from "../components/WsrsProfile";
 import { addCaseEntity, createAlertRule, getCase, listCases, logAudit, networkAccused, networkFinancial, networkPhone, searchMasterDossier } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { CaseDetail, CaseSummary, EntityType, GraphElements } from "../types";
@@ -84,6 +85,8 @@ export default function EntityDetail() {
         <Link className="secondary btn-link" to={`/network?focus=${encodeURIComponent(decodedValue)}&type=${type}`}>Explore in network view</Link>
       </div>
       {status && <p className="hint">{status}</p>}
+
+      {type === "person" && <WsrsProfile person={decodedValue} />}
 
       <div className="tab-bar">
         {(["overview", "relationships", "cases", "notes"] as Tab[]).map((t) => (

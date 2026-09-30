@@ -9,11 +9,14 @@ import {
   listCases,
   listPatterns,
   markAllAlertsRead,
+  repeatVictims,
+  wsrsLeaderboard,
 } from "../lib/api";
 import { formatCount, relativeTime } from "../lib/format";
 import { clearRecentSearches, getRecentSearches, rememberSearch } from "../lib/recent";
 import { useAsync } from "../lib/useAsync";
 import { usePageTitle } from "../lib/usePageTitle";
+import WsrsBadge from "../components/WsrsBadge";
 import ConfidencePill from "../components/ConfidencePill";
 import WomenSafetyBadge from "../components/WomenSafetyBadge";
 import type { AlertRecord } from "../types";
@@ -50,6 +53,9 @@ export default function Dashboard() {
   const showSystem = user?.role === "admin" || user?.role === "supervisor";
   const canIngest = user?.role !== "analyst";
   const system = useAsync(() => (showSystem ? health() : Promise.resolve(null)));
+  // Victim analytics are supervisor/admin only (the API enforces it too); nobody else even requests them.
+  const highRisk = useAsync(() => (showSystem ? wsrsLeaderboard(5) : Promise.resolve(null)));
+  const victims = useAsync(() => (showSystem ? repeatVictims() : Promise.resolve(null)));
 
   const [query, setQuery] = useState("");
   const [recent, setRecent] = useState(getRecentSearches);
@@ -223,6 +229,48 @@ export default function Dashboard() {
             </div>
             {alertGroups.length > 5 && <Link to="/alerts" className="more-link">+ {alertGroups.length - 5} more</Link>}
           </Panel>
+
+          {/* Highest-WSRS suspects (supervisor and admin only) */}
+          {showSystem && (
+            <Panel title="High-Risk WS Suspects" state={highRisk} skeletonRows={3}>
+              {highRisk.data && (
+                <div className="pattern-mini-list">
+                  {highRisk.data.suspects.map((s) => (
+                    <Link key={s.suspect} to={`/entity/person/${encodeURIComponent(s.suspect)}`} className="pattern-mini">
+                      <div className="pattern-mini-text">
+                        <span className="pattern-mini-type">{s.suspect}</span>
+                        <span className="pattern-mini-desc">{s.wsrs.factors.repeat.label} · {s.wsrs.factors.recency.label}</span>
+                      </div>
+                      <WsrsBadge total={s.score} tier={s.tier} />
+                    </Link>
+                  ))}
+                  {!highRisk.data.suspects.length && <p className="hint">No suspects have a women-safety risk score yet.</p>}
+                  <p className="lead-note">Investigative lead — verify before use.</p>
+                </div>
+              )}
+            </Panel>
+          )}
+
+          {/* Repeat victims: aggregate counts only, no identifiers are ever shown */}
+          {showSystem && (
+            <Panel title="Repeat victims" state={victims} skeletonRows={3}>
+              {victims.data && (
+                <>
+                  <div className="stat-list-row">
+                    <dt>Victims in 2+ FIRs</dt>
+                    <dd>{formatCount(victims.data.repeat_victim_count)}</dd>
+                  </div>
+                  <div className="suggest-group" style={{ marginTop: 10 }}>
+                    {victims.data.offense_categories.map((c) => (
+                      <span key={c.category} className="chip">{c.category.replace(/_/g, " ").toLowerCase()} · {c.victims}</span>
+                    ))}
+                    {!victims.data.offense_categories.length && <p className="hint">No repeat victimisation recorded.</p>}
+                  </div>
+                  <p className="lead-note">Investigative lead — verify before use. Pseudonymous; no personal data shown.</p>
+                </>
+              )}
+            </Panel>
+          )}
 
           {/* Quick actions */}
           <section className="card">

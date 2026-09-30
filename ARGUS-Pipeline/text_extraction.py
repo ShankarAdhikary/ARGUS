@@ -35,6 +35,10 @@ class ExtractedEntity(BaseModel):
     value: str = Field(min_length=1, max_length=500)
     confidence: float = Field(ge=0, le=1)
     evidence: str = Field(min_length=1, max_length=1000)
+    # Script-independent key for entity resolution (Ramesh / रमेश / RAMESH -> "ramesh"); set for persons, places and
+    # organisations. `aliases` keeps the original spelling when it differs.
+    canonical: Optional[str] = None
+    aliases: list[str] = Field(default_factory=list)
 
 
 class ExtractedRelationship(BaseModel):
@@ -213,7 +217,22 @@ def _regex_fallback(text: str) -> ExtractionResult:
     return ExtractionResult(entities=entities, relationships=relationships, extraction_method="regex_fallback")
 
 
+def _add_canonical_forms(result: ExtractionResult) -> ExtractionResult:
+    from indic_text import canonical_name, name_aliases
+
+    for entity in result.entities:
+        if entity.type in {"person", "location", "organization"}:
+            entity.canonical = canonical_name(entity.value) or None
+            entity.aliases = name_aliases(entity.value)
+    return result
+
+
 def extract_candidates(text: str) -> ExtractionResult:
+    """Extract candidates (LLM, then Indic NER, then regex) and stamp canonical name forms on the result."""
+    return _add_canonical_forms(_extract_candidates(text))
+
+
+def _extract_candidates(text: str) -> ExtractionResult:
     """Use the configured LLM provider; fall back to deterministic extraction."""
     if active_provider() is not None:
         try:

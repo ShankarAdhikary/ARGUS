@@ -11,6 +11,14 @@ import type {
   EntityType,
   IngestionHealth,
   PatternRecord,
+  RepeatVictimsResponse,
+  WsrsBreakdown,
+  HotspotCollection,
+  LedgerResponse,
+  EvidenceVerification,
+  VoiceResult,
+  RiskForecastResponse,
+  WsrsLeaderboardResponse,
   Role,
 } from "../types";
 
@@ -51,7 +59,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), path.startsWith("/api/v1/biometric") ? BIOMETRIC_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), path.startsWith("/api/v1/biometric") || path.startsWith("/api/v1/ingest/voice") ? BIOMETRIC_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
 
   let response: Response;
   try {
@@ -124,10 +132,19 @@ export function health() {
   return request<{ status: string; dependencies: Record<string, boolean> }>("/health");
 }
 
-export function ingestDataset(file: File) {
+export function ingestDataset(file: File, caseId?: string, justification?: string) {
   const form = new FormData();
   form.append("file", file);
+  if (caseId) form.append("case_id", caseId);
+  if (justification) form.append("justification", justification);
   return request<Record<string, unknown>>("/api/v1/ingest", { method: "POST", body: form });
+}
+
+export function ingestVoice(audio: Blob, filename: string, language?: string) {
+  const form = new FormData();
+  form.append("file", audio, filename);
+  if (language) form.append("language", language);
+  return request<VoiceResult>("/api/v1/ingest/voice", { method: "POST", body: form });
 }
 
 export function ingestText(sourceId: string, text: string, sourceType = "fir") {
@@ -327,6 +344,37 @@ export function patternFeedback(patternId: string, verdict: "useful" | "false_po
 
 export function centrality() {
   return request<CentralityRow[]>("/api/v1/analytics/centrality");
+}
+
+export function repeatVictims() {
+  return request<RepeatVictimsResponse>("/api/v1/analytics/repeat-victims");
+}
+
+export function personWsrs(person: string) {
+  return request<{ person: string; wsrs: WsrsBreakdown | null }>(`/api/v1/analytics/wsrs?person_name=${encodeURIComponent(person)}`);
+}
+
+export function wsrsLeaderboard(limit = 5) {
+  return request<WsrsLeaderboardResponse>(`/api/v1/analytics/wsrs-leaderboard?limit=${limit}`);
+}
+
+export function hotspots(category = "WOMEN_SAFETY") {
+  return request<HotspotCollection>(`/api/v1/analytics/hotspots?category=${encodeURIComponent(category)}`);
+}
+
+export function riskForecast(jurisdiction: string) {
+  return request<RiskForecastResponse>(`/api/v1/analytics/risk-forecast?jurisdiction=${encodeURIComponent(jurisdiction)}`);
+}
+
+export function evidenceLedger(caseId: string, justification?: string) {
+  const q = new URLSearchParams({ case_id: caseId });
+  if (justification) q.set("justification", justification);
+  return request<LedgerResponse>(`/api/v1/evidence/ledger?${q}`);
+}
+
+export function verifyEvidence(fileId: string, justification?: string) {
+  const q = justification ? `?justification=${encodeURIComponent(justification)}` : "";
+  return request<EvidenceVerification>(`/api/v1/evidence/verify/${fileId.split("/").map(encodeURIComponent).join("/")}${q}`);
 }
 
 export interface ResolveCandidate {

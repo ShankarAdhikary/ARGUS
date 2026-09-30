@@ -5,6 +5,7 @@ SQL — no ORM, matching the rest of the codebase's lightweight style.
 
 import os
 from contextlib import contextmanager
+from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
@@ -245,7 +246,62 @@ CREATE POLICY case_notes_scope ON case_notes USING ({child.format(table='case_no
 """
 
 
+MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+SPLIT_MARKER = "-- migrate:split"
+
+
+def apply_migrations() -> list[str]:
+    """Apply migrations/NNN_*.sql in order (rollback files are skipped). Every file is idempotent, so this runs at each start.
+
+    Runs on its own autocommit connection so `CREATE INDEX CONCURRENTLY` works. A file that fails (e.g. PostGIS is not
+    installed in the database image) is logged and skipped so the rest of the platform still starts.
+    """
+    applied = []
+    conn = psycopg2.connect(host=POSTGRES_HOST, port=POSTGRES_PORT, user=POSTGRES_USER, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB)
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_lock(724003)")  # API workers start together
+            try:
+                for path in sorted(p for p in MIGRATIONS_DIR.glob("[0-9]*_*.sql") if not p.name.endswith(".rollback.sql")):
+                    try:
+                        for chunk in path.read_text().split(SPLIT_MARKER):
+                            if any(line.strip() and not line.lstrip().startswith("--") for line in chunk.splitlines()):
+                                cur.execute(chunk)
+                        applied.append(path.name)
+                    except Exception as exc:
+                        print(f"[!] Migration {path.name} failed and was skipped: {exc}")
+            finally:
+                cur.execute("SELECT pg_advisory_unlock(724003)")
+    finally:
+        conn.close()
+    return applied
+
+
+INIT_LOCK = 724000
+
+
 def init_db() -> None:
+    """Runs `_init_db` while holding one session-level advisory lock.
+
+    The API starts several uvicorn workers at once and each calls this. Without one lock around the whole thing their
+    DDL (schema, migrations, RLS policies) deadlocks; with it the second worker simply waits and finds every step
+    already done (all of them are idempotent).
+    """
+    conn = psycopg2.connect(host=POSTGRES_HOST, port=POSTGRES_PORT, user=POSTGRES_USER, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB)
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_lock(%s)", (INIT_LOCK,))
+            try:
+                _init_db()
+            finally:
+                cur.execute("SELECT pg_advisory_unlock(%s)", (INIT_LOCK,))
+    finally:
+        conn.close()
+
+
+def _init_db() -> None:
     """Creates the platform schema and optionally seeds demo users.
 
     Demo user seeding only runs when the SEED_DEMO_USERS environment variable
@@ -257,6 +313,8 @@ def init_db() -> None:
     with get_cursor(commit=True) as cur:
         cur.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
         cur.execute(SCHEMA)
+    apply_migrations()  # spatial + evidence tables; before the RLS grants below so the restricted role covers them
+    with get_cursor(commit=True) as cur:
         if os.getenv("ENABLE_DB_RLS", "true").lower() == "true":
             cur.execute(_rls_sql())
             _rls_ready = True

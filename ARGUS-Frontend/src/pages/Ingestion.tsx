@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from "react";
 import PageHeader from "../components/PageHeader";
+import VoiceFir from "../components/VoiceFir";
 import { getJob, health, ingestDataset, ingestText, resolveCheck, resolveDecision } from "../lib/api";
 import type { ResolveCandidate } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -131,6 +132,7 @@ export default function Ingestion() {
         <section className="card">
           <span className="section-label">02 · Zero-shot extraction</span>
           <h2>Extract messy narrative</h2>
+          {canIngest && <VoiceFir onUseTranscript={(t) => setText(t)} />}
           <form onSubmit={extractText}><fieldset disabled={!canIngest || busy} className="bare-fieldset">
             <label>Source ID<input value={sourceId} onChange={(event) => setSourceId(event.target.value)} /></label>
             <label>Investigative text<textarea rows={4} value={text} onChange={(event) => setText(event.target.value)} /></label>

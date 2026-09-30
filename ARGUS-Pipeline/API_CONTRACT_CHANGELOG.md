@@ -151,3 +151,22 @@ rejected and `/auth/login` plus the MFA endpoints answer 400. Unset (the default
 **Server.** `uvicorn --timeout-keep-alive 65` (the 5 s default dropped idle connections that clients were about to reuse: `RemoteDisconnected` on the first request after a pause).
 
 **Load test.** `tests/load/locustfile.py` (locust). 50 users / 60 s against the demo stack: 6,450 requests, 0 failures, search p95 ≈ 180 ms (target 3,000 ms).
+
+## Production build additions (post-MVP; `openapi-mvp-v1.json` has not been regenerated for these)
+
+New endpoints, all JWT-authenticated, jurisdiction-scoped where they read graph data, and audit-logged:
+
+- `GET /api/v1/network/charges?person_name=` - charge history as a subgraph (LegalCharge nodes).
+- `GET /api/v1/analytics/charge-patterns` - IPC/BNS co-charge pairs and matrix.
+- `GET /api/v1/analytics/repeat-victims` - supervisor/admin; aggregate, pseudonymous.
+- `GET /api/v1/analytics/wsrs?person_name=`, `GET /api/v1/analytics/wsrs-leaderboard` (supervisor/admin),
+  `POST /api/v1/analytics/wsrs/recompute` (admin) - Women Safety Risk Score with factor breakdown.
+- `GET /api/v1/analytics/hotspots?category=`, `GET /api/v1/analytics/risk-forecast?jurisdiction=` (analyst and above).
+- `GET /api/v1/evidence/ledger?case_id=`, `GET /api/v1/evidence/verify/{file_id}` - evidence chain of custody.
+- `POST /api/v1/ingest/voice` - offline Whisper transcription; returns transcript, entities, suggested FIR fields.
+
+Changed behaviour: `POST /api/v1/ingest` accepts optional `case_id` / `justification` form fields and now writes an
+evidence-ledger row and an audit entry. `/ingest/text` responses gain `legal_sections` and per-entity `canonical`/`aliases`.
+`/resolve/check` matches across scripts (`match_type: transliteration_match`). `/network/phone`, `/network/financial`,
+`/network/path` and `/analytics/burners` are jurisdiction-scoped for scoped roles; an out-of-scope node answers like an
+unknown one. The API is no longer published on port 8000: it is reached through nginx over TLS.
