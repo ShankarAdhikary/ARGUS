@@ -46,6 +46,7 @@ from config import (
     VOICE_MAX_BYTES,
 )
 import evidence
+from demo_guard import assert_no_demo_credentials
 import fingerprint
 from scoping import SUSPECT_IN_SCOPE, node_in_scope, path_in_scope
 import geo_risk
@@ -98,6 +99,8 @@ async def _startup() -> None:
         ensure_schema(neo4j_driver)
     except Exception as exc:  # pragma: no cover
         print(f"[!] Graph schema migration failed: {exc}")
+    # Production only: refuse to serve while any account still has a published demo password (raises -> the API exits).
+    await asyncio.to_thread(assert_no_demo_credentials)
 
 app.add_middleware(
     CORSMiddleware,

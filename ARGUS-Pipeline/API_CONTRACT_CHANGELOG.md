@@ -185,3 +185,19 @@ unknown one. The API is no longer published on port 8000: it is reached through 
 - A print that fails the quality gate (blank, blurred or washed-out image, or too few minutiae) is refused with **422** and a
   `quality_check` body, before any matching. `nfiq_score` is always `null`: no NFIQ/NFIQ2 is computed; `quality_score` names its
   `method` (`variance+ridge-frequency` image gate, `minutiae-count`, or the lower of the two).
+
+## Face biometrics: audit and jurisdiction scoping
+
+- `POST /biometric/hunt` now writes an audit entry for every search (hit, miss or error: probe SHA-256, jurisdiction filter,
+  top match, similarity) and only considers faces enrolled in the caller's jurisdiction. It accepts optional `case_id` and
+  `justification` form fields, like the fingerprint match.
+- `POST /biometric/enroll`, `/unified-enroll`, `/bulk-portal-enroll` and `/bulk-upload-zip` audit-log the enrolment and stamp the
+  face with a jurisdiction (the enrolling officer's own; Unassigned for unscoped roles). Faces enrolled before this change have
+  none and count as Unassigned (visible only to unscoped roles): run `scripts/backfill_face_jurisdiction.py` to resolve them
+  from their FIR.
+
+## Production start-up guards
+
+- The API refuses to start with `ARGUS_ENV=production` while any stored account still uses a published demo password
+  (`demo_guard.py`; fails closed if the check cannot run). `scripts/preflight.py` also refuses when compose would seed the demo
+  accounts (`SEED_DEMO_USERS` defaults to true, so production must set it to false explicitly).
