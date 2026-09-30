@@ -1,0 +1,4 @@
+# Offline voice-to-FIR: open-weight Whisper (NOT the OpenAI API). Model "small" (~244M params, ~500 MB) runs on CPU.
+# Needs the ffmpeg binary (installed by the Dockerfile) and torch (requirements-indic.txt, or pulled in by whisper itself).
+# Skip with: docker compose build --build-arg INSTALL_VOICE=false api
+openai-whisper==20250625

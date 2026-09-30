@@ -1,0 +1,14 @@
+# LOCAL DEBUGGING ONLY. Publishes the Neo4j browser and the MinIO console on localhost.
+#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up -d
+# Never use with ARGUS_ENV=production: ARGUS_DEBUG_PORTS_OPEN makes the API refuse to start, and
+# scripts/preflight.py rejects the merged config.
+services:
+  api:
+    environment:
+      ARGUS_DEBUG_PORTS_OPEN: "true"
+  neo4j:
+    ports:
+      - "127.0.0.1:7474:7474"
+  minio:
+    ports:
+      - "127.0.0.1:9001:9001"

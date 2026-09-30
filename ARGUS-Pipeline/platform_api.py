@@ -25,6 +25,8 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from audit import log_action, verify_chain
+from indic_text import canonical_name
+from wsrs import WS_NETWORKS, WS_TERMS
 from report_docx import build_case_docx
 from request_context import CROSS_JURISDICTION_ROLES
 from auth_security import (
@@ -588,19 +590,29 @@ async def resolve_check(name: str, current_user: dict = Depends(get_current_user
         result = session.run("MATCH (s:Suspect) RETURN DISTINCT s.id AS name")
         candidates = [row["name"] for row in result if row["name"]]
     scored = []
+    # Names are compared on their script-independent canonical form first ("रमेश" == "Ramesh" == "RAMESH"), and on the
+    # raw lowercase spelling as well so plain Latin behaviour is never worse than before.
+    name_key = canonical_name(name)
     for candidate in candidates:
         if candidate.lower() == name.lower():
             continue
-        similarity = fuzz.ratio(name.lower(), candidate.lower()) / 100.0
+        candidate_key = canonical_name(candidate)
+        same_canonical = bool(name_key) and name_key == candidate_key
+        similarity = max(
+            fuzz.ratio(name.lower(), candidate.lower()),
+            fuzz.ratio(name_key, candidate_key) if name_key and candidate_key else 0,
+        ) / 100.0
         if similarity > 0.5:
             rounded = round(similarity, 2)
             scored.append(
                 {
                     "candidate": candidate,
                     "similarity": rounded,
-                    "match_type": "fuzzy_name",
+                    "match_type": "transliteration_match" if same_canonical else "fuzzy_name",
+                    "canonical": candidate_key,
                     "resolution": "review",
                     "suggested": "merge" if rounded >= 0.92 else "possible_match",
+                    "label": "investigative lead — verify before use",
                 }
             )
     scored.sort(key=lambda x: x["similarity"], reverse=True)
@@ -1081,8 +1093,8 @@ async def _base_patterns(feedback: dict) -> list[dict]:
 # A pattern is flagged only when the FIRs behind it are actually trafficking / exploitation-of-persons cases,
 # so the badge means something. Blanket-flagging every repeat offender would label people with no basis.
 
-_WS_NETWORKS = {"trafficking"}
-_WS_TERMS = re.compile(r"\b(minor|women|woman|girl|girls|stalk\w*|domestic violence|dowry|sexual\w*)\b", re.I)
+_WS_NETWORKS = WS_NETWORKS
+_WS_TERMS = WS_TERMS
 WS_MIN_SHARE = float(os.getenv("WOMEN_SAFETY_MIN_SHARE", "0.30"))
 WS_MIN_FIRS_REPEAT = int(os.getenv("WOMEN_SAFETY_MIN_FIRS", "3"))
 WS_MIN_FIRS_CLUSTER = 2
@@ -1135,17 +1147,17 @@ def _women_safety_patterns(scope: Optional[str]) -> list[dict]:
             WHERE true {scope_clause}
             WITH s, collect(DISTINCT f.id) AS firs
             WHERE size(firs) >= 3
-            RETURN s.id AS suspect, firs
+            RETURN s.id AS suspect, firs, s.wsrs_score AS wsrs_score, s.wsrs_tier AS wsrs_tier
             """,
             scope=scope,
         )
         rows = []
         for r in repeat:
             flag, hits, share = _women_safety_assessment(r["firs"], relevant)
-            rows.append((flag, len(r["firs"]), r["suspect"], hits, share))
+            rows.append((flag, len(r["firs"]), r["suspect"], hits, share, r["wsrs_score"], r["wsrs_tier"]))
         # Women-safety-relevant offenders first, then by how often they recur.
         rows.sort(key=lambda x: (not x[0], -x[1], x[2]))
-        for flag, fir_count, suspect, hits, share in rows[:10]:
+        for flag, fir_count, suspect, hits, share, wsrs_score, wsrs_tier in rows[:10]:
             out.append({
                 "pattern_id": f"repeat-{suspect}",
                 "pattern_type": "repeat_offender_recurrence",
@@ -1159,7 +1171,10 @@ def _women_safety_patterns(scope: Optional[str]) -> list[dict]:
                 "source": "graph_recurrence",
                 "women_safety_flag": flag,
                 "women_safety_fir_count": hits,
-                "risk_tier": "HIGH" if fir_count >= 5 else "MEDIUM",
+                # The stored WSRS (see wsrs.py) supersedes the FIR-count heuristic when the suspect has one.
+                "risk_tier": wsrs_tier or ("HIGH" if fir_count >= 5 else "MEDIUM"),
+                "wsrs_score": wsrs_score,
+                "wsrs_tier": wsrs_tier,
             })
 
         pairs = session.run(

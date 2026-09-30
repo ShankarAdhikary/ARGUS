@@ -4,11 +4,12 @@ import PageHeader from "../components/PageHeader";
 import LeadNotice from "../components/LeadNotice";
 import SensitiveBanner from "../components/SensitiveBanner";
 import NetworkGraph from "../components/NetworkGraph";
+import EvidenceTab from "../components/EvidenceTab";
 import { addCaseNote, auditLog, getCase, logAudit, networkAccused, networkPhone } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { AuditEntry, CaseDetail, EntityType, GraphElements } from "../types";
 
-type Tab = "overview" | "network" | "report" | "access";
+type Tab = "overview" | "network" | "evidence" | "report" | "access";
 
 export default function CaseWorkspace() {
   const { id = "" } = useParams();
@@ -122,7 +123,7 @@ export default function CaseWorkspace() {
       {caseRecord.is_sensitive && <SensitiveBanner reason={caseRecord.sensitivity_reason} />}
 
       <div className="tab-bar">
-        {(["overview", "network", "report", "access"] as Tab[]).map((t) => (
+        {(["overview", "network", "evidence", "report", "access"] as Tab[]).map((t) => (
           <button key={t} className={`tab ${tab === t ? "tab-active" : ""}`} onClick={() => setTab(t)}>{t === "report" ? "report builder" : t === "access" ? "access log" : t}</button>
         ))}
       </div>
@@ -165,6 +166,10 @@ export default function CaseWorkspace() {
         <section className="card">
           {graph.nodes.length ? <NetworkGraph elements={graph} height={420} /> : <p className="hint">Pin an entity to see its network here.</p>}
         </section>
+      )}
+
+      {tab === "evidence" && (
+        <EvidenceTab caseId={id} justification={sessionStorage.getItem(`justification:${id}`) ?? undefined} />
       )}
 
       {tab === "report" && (

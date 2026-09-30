@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Nav from "./components/Nav";
+import GeographicRisk from "./pages/GeographicRisk";
 import { AuthProvider, ProtectedRoute, useAuth } from "./lib/auth";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -52,6 +53,7 @@ function AppShell() {
             <Route path="/cases/:id/report" element={<ProtectedRoute><ReportBuilder /></ProtectedRoute>} />
             <Route path="/patterns" element={<ProtectedRoute><Patterns /></ProtectedRoute>} />
             <Route path="/patterns/:id" element={<ProtectedRoute><PatternDetail /></ProtectedRoute>} />
+            <Route path="/geo-risk" element={<ProtectedRoute><GeographicRisk /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
             <Route path="/hunt" element={<ProtectedRoute><Hunt /></ProtectedRoute>} />
             <Route path="/ingestion" element={<ProtectedRoute><Ingestion /></ProtectedRoute>} />

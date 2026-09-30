@@ -19,6 +19,11 @@ from config import (
     REDIS_PASSWORD,
     REDIS_PORT,
 )
+from indic_text import canonical_name, name_aliases
+import geo_risk
+import geo_store
+import wsrs
+from legal_graph import charges_for_record, ensure_schema, strip_victim_pii, write_legal_layer
 from jurisdictions import jurisdiction_for_station
 from platform_api import check_and_fire_alerts
 
@@ -61,6 +66,10 @@ def update_job(event, status, message=None):
 
 def process_queue():
     print("[*] ARGUS Pipeline Worker started. Listening for events...")
+    try:
+        ensure_schema(neo4j_driver)
+    except Exception as exc:
+        print(f"[!] Graph schema migration failed (will retry on next start): {exc}")
     while True:
         event = {}
         try:
@@ -100,6 +109,17 @@ def process_queue():
                     # Every FIR is stamped with the jurisdiction that owns its station, so search and graph
                     # results can be scoped to it. An explicit value in the file wins.
                     record.setdefault("jurisdiction", jurisdiction_for_station(record.get("station")))
+                    # Victim identifiers are hashed into the graph below; the raw values never reach Elasticsearch.
+                    legal_record = dict(record)
+                    strip_victim_pii(record)
+                    # Canonical Latin key goes into the index; the original script is kept as an alias.
+                    record["accused_canonical"] = canonical_name(record.get("accused") or "")
+                    record["accused_aliases"] = name_aliases(record.get("accused") or "")
+                    # Offline geocode (bundled station/district centroids); the level/confidence say how coarse it is.
+                    geo = geo_risk.geocode_record(record)
+                    if geo:
+                        record["location"] = {"lat": geo["lat"], "lon": geo["lon"]}
+                        record["geocode"] = {"level": geo["level"], "confidence": geo["confidence"], "place": geo["place"]}
                     es_client.index(
                         index="argus-firs", id=record.get("fir_id"), document=record
                     )
@@ -112,7 +132,9 @@ def process_queue():
                             MERGE (s:Suspect {id: $suspect_id})
                             MERGE (f:FIR {id: $fir_id})
                             MERGE (s)-[link:LINKED_TO_FIR]->(f)
-                            SET f.date = $date, f.jurisdiction = $jurisdiction, link.date = $date, link.source_record_id = $fir_id
+                            SET f.date = $date, f.jurisdiction = $jurisdiction, link.date = $date, link.source_record_id = $fir_id,
+                                s.canonical = $canonical, f.station = $station, f.ws_text = $ws_text,
+                                f.lat = $lat, f.lon = $lon, f.geo_level = $geo_level
                             // Without this the suspect/FIR records and the call
                             // graph stay disconnected, so no network path exists
                             // between a named person and the numbers they use.
@@ -122,14 +144,33 @@ def process_queue():
                             )
                             """,
                             suspect_id=accused,
+                            canonical=record["accused_canonical"],
+                            station=record.get("station"),
+                            ws_text=wsrs.is_ws_text(record),
+                            lat=geo["lat"] if geo else None,
+                            lon=geo["lon"] if geo else None,
+                            geo_level=geo["level"] if geo else None,
                             fir_id=record.get("fir_id"),
                             mobile=mobile,
                             date=record.get("date"),
                             jurisdiction=record["jurisdiction"],
                         )
+                        # IPC/BNS charges and (hashed) victims from this FIR.
+                        write_legal_layer(session, legal_record, accused)
+                    try:
+                        cats = [c["offense_category"] for c in charges_for_record(legal_record)]
+                        geo_store.upsert_fir(record, geo, cats, geo_store.ws_categories(cats) or wsrs.is_ws_text(record))
+                    except Exception as geo_exc:
+                        print(f"[!] PostGIS mirror failed (non-fatal): {geo_exc}")
                     touched_entities.append(accused)
                     if mobile:
                         touched_entities.append(mobile)
+                # WSRS depends on the whole graph, so refresh it for the accused in this file and their co-accused.
+                try:
+                    with neo4j_driver.session() as session:
+                        wsrs.recompute(session, sorted({r.get("accused") for r in file_data if r.get("accused")}))
+                except Exception as wsrs_exc:
+                    print(f"[!] WSRS recompute failed (non-fatal): {wsrs_exc}")
                 try:
                     check_and_fire_alerts(touched_entities)
                 except Exception as alert_exc:
@@ -224,6 +265,13 @@ def process_queue():
                             confidence=record.get("match_confidence", 0.0),
                         )
                     touched_entities.append(suspect_name)
+                    try:
+                        geo_store.upsert_sighting(
+                            str(record.get("event_id", camera_id)), suspect_name, camera_id, record.get("timestamp"),
+                            record.get("match_confidence", 0.0), geo_risk.geocode_record({**record, "station": zone, "description": zone}),
+                        )
+                    except Exception as geo_exc:
+                        print(f"[!] PostGIS sighting mirror failed (non-fatal): {geo_exc}")
                 try:
                     check_and_fire_alerts(touched_entities)
                 except Exception as alert_exc:

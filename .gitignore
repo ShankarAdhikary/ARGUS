@@ -19,3 +19,4 @@ uploads/
 backups/
 
 .DS_Store
+!ARGUS-Frontend/.env.production

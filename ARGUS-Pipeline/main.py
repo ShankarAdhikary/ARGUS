@@ -42,12 +42,23 @@ from config import (
     REDIS_HOST,
     REDIS_PASSWORD,
     REDIS_PORT,
+    VOICE_MAX_BYTES,
 )
+import evidence
+from scoping import SUSPECT_IN_SCOPE, node_in_scope, path_in_scope
+import geo_risk
+import voice
+from evidence_api import router as evidence_router, _authorize_case
+from indic_text import canonical_name, extract_legal_sections, name_aliases
 from text_extraction import extract_candidates
 from db import init_db
 from face_index import FaceIndex
 from jurisdictions import UNASSIGNED, jurisdiction_for_station
 from platform_api import router as platform_router, check_and_fire_alerts, log_action, burner_cutoff, search_scope
+from legal_api import router as legal_router
+from wsrs_api import router as wsrs_router
+from geo_api import router as geo_router
+from legal_graph import ensure_schema
 from auth_security import get_current_user, require_role
 from platform_api import enforce_case_access
 
@@ -65,6 +76,10 @@ app = FastAPI(
     description="Frozen ARGUS hackathon MVP API contract. Update openapi-mvp-v1.json before changing endpoints.",
 )
 app.include_router(platform_router)
+app.include_router(legal_router)
+app.include_router(wsrs_router)
+app.include_router(geo_router)
+app.include_router(evidence_router)
 
 
 @app.on_event("startup")
@@ -77,6 +92,10 @@ async def _startup() -> None:
         init_db()
     except Exception as exc:  # pragma: no cover - surfaced via /health instead
         print(f"[!] Postgres init failed (platform endpoints will error until fixed): {exc}")
+    try:
+        ensure_schema(neo4j_driver)
+    except Exception as exc:  # pragma: no cover
+        print(f"[!] Graph schema migration failed: {exc}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -220,9 +239,13 @@ async def health_check():
 @app.post("/api/v1/ingest")
 async def ingest_dataset(
     file: UploadFile = File(...),
+    case_id: str | None = Form(default=None),
+    justification: str | None = Form(default=None),
     current_user: dict = Depends(require_role("admin", "investigator", "supervisor")),
 ):
     try:
+        if case_id:  # evidence attached to a case: the uploader must be allowed to see that case
+            await asyncio.to_thread(_authorize_case, case_id, justification, current_user)
         file_bytes = await file.read()
         filename = file.filename or "dataset.json"
         lowered_filename = filename.lower()
@@ -249,6 +272,10 @@ async def ingest_dataset(
         file_path = f"raw/{checksum[:12]}-{filename}"
         try:
             _put_object(file_path, file_bytes, file.content_type or "application/json")
+            # Chain of custody: a ledger row (SHA-256 + uploader + hash link). If it cannot be written, refuse the upload.
+            ledger = await asyncio.to_thread(evidence.record_upload, file_path, file_bytes, current_user["full_name"], case_id, filename, file.content_type)
+            log_action(current_user, action="ingest_upload", resource=f"file:{file_path[:150]}",
+                       extra={"file_sha256": ledger["file_sha256"], "ledger_row_hash": ledger["row_hash"], "case_id": case_id})
             record_count = None
             try:
                 parsed = json.loads(file_bytes)
@@ -317,6 +344,72 @@ async def retry_job(
     return {"status": "pending", "job_id": job_id, "message": "Job requeued for processing."}
 
 
+@app.post("/api/v1/ingest/voice")
+async def ingest_voice(
+    file: UploadFile = File(...),
+    language: str | None = Form(default=None, pattern="^[a-z]{2,3}$"),
+    case_id: str | None = Form(default=None),
+    justification: str | None = Form(default=None),
+    current_user: dict = Depends(require_role("admin", "investigator", "supervisor")),
+):
+    """Offline Whisper transcription of a spoken complaint, run through the same NER pipeline as /ingest/text.
+
+    Returns the transcript, entities and suggested FIR fields for the officer to review. Nothing is queued for graph
+    ingestion here: ASR errors must be corrected first, and the reviewed text is then submitted via /ingest/text.
+    The audio itself is stored and entered in the evidence ledger.
+    """
+    if not voice.is_enabled():
+        raise HTTPException(status_code=503, detail="Voice transcription is disabled on this deployment.")
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in voice.ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=415, detail="Upload WAV, MP3 or M4A audio.")
+    audio = await file.read(VOICE_MAX_BYTES + 1)
+    if len(audio) > VOICE_MAX_BYTES:
+        raise HTTPException(status_code=413, detail=f"Audio is larger than {VOICE_MAX_BYTES // (1024 * 1024)} MB.")
+    if not audio or voice.sniff_audio(audio) is None:
+        raise HTTPException(status_code=415, detail="The file does not look like WAV, MP3 or M4A audio.")
+    try:
+        if case_id:
+            await asyncio.to_thread(_authorize_case, case_id, justification, current_user)
+        object_key = f"voice/{hashlib.sha256(audio).hexdigest()[:12]}{suffix}"
+        _put_object(object_key, audio, file.content_type or "application/octet-stream")
+        ledger = await asyncio.to_thread(evidence.record_upload, object_key, audio, current_user["full_name"], case_id, file.filename, file.content_type)
+        try:
+            spoken = await asyncio.to_thread(voice.transcribe, audio, suffix, language)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=_safe_detail(exc)) from exc
+        transcript = spoken["text"]
+        if not transcript:
+            raise HTTPException(status_code=422, detail="No speech was detected in the recording.")
+        extraction = await asyncio.to_thread(extract_candidates, transcript)
+        legal_sections = extract_legal_sections(transcript)
+        entities = [e.model_dump() for e in extraction.entities] + [
+            {"type": "legal_section", "value": f"{s['act']} {s['section']}", "confidence": s["confidence"],
+             "evidence": s["evidence"], "canonical": None, "aliases": [], "offense_category": s["offense_category"]}
+            for s in legal_sections
+        ]
+        geo = geo_risk.geocode_record({"description": transcript})
+        log_action(current_user, action="ingest_voice", resource=f"file:{object_key}",
+                   extra={"file_sha256": ledger["file_sha256"], "ledger_row_hash": ledger["row_hash"], "case_id": case_id,
+                          "language": spoken["language"], "entities": len(entities)})
+        return {
+            "status": "transcribed",
+            "transcript": transcript,
+            "language": spoken["language"],
+            "segments": spoken["segments"],
+            "entities": entities,
+            "relationships": [r.model_dump() for r in extraction.relationships],
+            "extraction_method": extraction.extraction_method,
+            "suggested_fir_fields": voice.suggest_fir_fields(transcript, entities, legal_sections, geo),
+            "evidence": {"file_id": object_key, "file_sha256": ledger["file_sha256"]},
+            "message": "Transcript is machine-generated and may contain errors. Investigative lead — verify before use.",
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_safe_detail(exc)) from exc
+
+
 @app.post("/api/v1/ingest/text")
 async def ingest_text(
     payload: TextIngestionRequest,
@@ -325,10 +418,12 @@ async def ingest_text(
     """Extract validated candidate entities from unstructured text and queue them for graph ingestion."""
     try:
         extraction = await asyncio.to_thread(extract_candidates, payload.text)
+        legal_sections = extract_legal_sections(payload.text)
         normalized = {
             "source_id": payload.source_id,
             "source_type": payload.source_type,
             "raw_text": payload.text,
+            "legal_sections": legal_sections,
             **extraction.model_dump(),
         }
         encoded = json.dumps(normalized).encode("utf-8")
@@ -342,6 +437,9 @@ async def ingest_text(
         storage_path = f"normalized/{payload.source_id}-{checksum[:12]}.json"
         try:
             _put_object(storage_path, encoded, "application/json")
+            ledger = await asyncio.to_thread(evidence.record_upload, storage_path, encoded, current_user["full_name"], None, f"{payload.source_id}.json", "application/json")
+            log_action(current_user, action="ingest_text", resource=f"file:{storage_path[:150]}",
+                       extra={"file_sha256": ledger["file_sha256"], "ledger_row_hash": ledger["row_hash"]})
             event = {
                 "job_id": job_id,
                 "dataset_type": "normalized_extraction",
@@ -370,7 +468,8 @@ async def ingest_text(
             "extraction_method": extraction.extraction_method,
             "entities": extraction.entities,
             "relationships": extraction.relationships,
-            "message": "Validated candidate extraction queued for graph ingestion. Verify candidates before operational use.",
+            "legal_sections": legal_sections,
+            "message": "Validated candidate extraction queued for graph ingestion. Investigative lead — verify before use.",
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_safe_detail(exc)) from exc
@@ -386,7 +485,11 @@ def _scoped(query: dict, scope: str | None) -> dict:
 async def search_firs(q: str, current_user: dict = Depends(get_current_user)):
     try:
         scope = search_scope(current_user)
-        text_query = {"multi_match": {"query": q, "fields": ["station", "complainant", "accused", "description"]}}
+        text_query = {"multi_match": {"query": q, "fields": ["station", "complainant", "accused", "accused_aliases", "description"]}}
+        canonical_q = canonical_name(q)
+        if canonical_q:
+            # "रमेश", "Ramesh" and "RAMESH" all hit the same canonical key.
+            text_query = {"bool": {"should": [text_query, {"match": {"accused_canonical": {"query": canonical_q, "operator": "and"}}}], "minimum_should_match": 1}}
         response = es_client.search(index="argus-firs", query=_scoped(text_query, scope))
         hits = [hit["_source"] for hit in response["hits"]["hits"]]
         log_action(current_user, action="search_firs", resource=f"search:{q[:80]}",
@@ -504,10 +607,12 @@ async def get_network_path(
     current_user: dict = Depends(get_current_user),
 ):
     enforce_case_access(case_id, justification, current_user)
+    scope = search_scope(current_user)
     query = """
     MATCH path = shortestPath((a {id: $source})-[*..6]-(b {id: $target}))
     WITH nodes(path) AS path_nodes, relationships(path) AS path_edges
     RETURN
+      [n IN path_nodes | {label: head(labels(n)), id: n.id}] AS raw_nodes,
       [n IN path_nodes | {
         id: (CASE WHEN head(labels(n)) = 'Suspect' THEN 'person' ELSE toLower(head(labels(n))) END) + ':' + coalesce(n.id, elementId(n)),
         label: coalesce(n.id, elementId(n)),
@@ -522,15 +627,21 @@ async def get_network_path(
       }] AS edges
     """
     with neo4j_driver.session() as session:
-        record = session.run(query, source=source, target=target).single()
-    if not record:
-        raise HTTPException(status_code=404, detail="No path found within six hops.")
+        # A scoped officer only gets paths whose end points and every person/FIR on the way lie in their jurisdiction;
+        # anything else answers exactly like "no path", so the API cannot be used to probe other jurisdictions.
+        allowed = node_in_scope(session, source, scope) and node_in_scope(session, target, scope)
+        record = session.run(query, source=source, target=target).single() if allowed else None
+        if record and not path_in_scope(session, record["raw_nodes"], scope):
+            record = None
     log_action(
         current_user,
         action="find_network_path",
         resource=f"{source}->{target}",
         justification=justification,
+        extra={"jurisdiction_filter": scope, "found": bool(record)},
     )
+    if not record:
+        raise HTTPException(status_code=404, detail="No path found within six hops.")
     return {"status": "success", "source": source, "target": target, "nodes": record["nodes"], "edges": record["edges"]}
 
 @app.get("/api/v1/network/phone")
@@ -542,6 +653,7 @@ async def get_phone_network(
 ):
     try:
         enforce_case_access(case_id, justification, current_user)
+        scope = search_scope(current_user)
         query = """
         MATCH (p:Phone {id: $phone})-[c:CALLED]-(connected:Phone)
         RETURN connected.id AS connected_phone, c.duration AS duration, c.timestamp AS timestamp
@@ -549,15 +661,23 @@ async def get_phone_network(
         # A handset with no call records can still be attributed to suspects.
         # Returning only CALLED edges made such phones look unconnected even
         # when the graph knew exactly who used them.
-        user_query = """
-        MATCH (s:Suspect)-[:USES_PHONE]->(p:Phone {id: $phone})
+        user_query = f"""
+        MATCH (s:Suspect)-[:USES_PHONE]->(p:Phone {{id: $phone}})
+        WHERE $scope IS NULL OR {SUSPECT_IN_SCOPE}
         RETURN collect(DISTINCT s.id) AS users
         """
         with neo4j_driver.session() as session:
-            result = session.run(query, phone=phone_number)
-            connections = [{"connected_phone": row["connected_phone"], "duration": row["duration"], "timestamp": row["timestamp"]} for row in result]
-            users_row = session.run(user_query, phone=phone_number).single()
+            users_row = session.run(user_query, phone=phone_number, scope=scope).single()
             users = users_row["users"] if users_row else []
+            # A scoped officer sees a handset only through suspects with FIRs in their jurisdiction. Anyone else's
+            # phone answers like an unknown number (no 403 that would confirm it exists).
+            visible = scope is None or bool(users)
+            connections = []
+            if visible:
+                connections = [{"connected_phone": row["connected_phone"], "duration": row["duration"], "timestamp": row["timestamp"]}
+                               for row in session.run(query, phone=phone_number)]
+            log_action(current_user, action="view_phone_network", resource=f"phone:{phone_number[:40]}", justification=justification,
+                       extra={"jurisdiction_filter": scope, "in_scope": visible})
 
             return {
                 "status": "success",
@@ -581,6 +701,7 @@ async def get_financial_network(
     """Return direct transaction partners for a FinancialAccount node."""
     try:
         enforce_case_access(case_id, justification, current_user)
+        scope = search_scope(current_user)
         query = """
         MATCH (a:FinancialAccount {id: $account_id})-[t:TRANSACTED_WITH]-(partner:FinancialAccount)
         RETURN partner.id AS partner_id, t.amount AS amount, t.direction AS direction,
@@ -589,13 +710,17 @@ async def get_financial_network(
         LIMIT 50
         """
         # Look for suspects whose name appears in FIRs alongside this account
-        suspect_query = """
+        suspect_query = f"""
         MATCH (s:Suspect)-[:LINKED_TO_FIR]->(f:FIR)
-        WHERE f.id CONTAINS $account_id OR s.id CONTAINS $account_id
+        WHERE (f.id CONTAINS $account_id OR s.id CONTAINS $account_id) AND ($scope IS NULL OR {SUSPECT_IN_SCOPE})
         RETURN collect(DISTINCT s.id) AS suspects
         """
         with neo4j_driver.session() as session:
-            result = session.run(query, account_id=account_id)
+            suspects_row = session.run(suspect_query, account_id=account_id, scope=scope).single()
+            suspects = suspects_row["suspects"] if suspects_row else []
+            # Accounts have no FIR link of their own: a scoped officer sees one only through in-scope suspects.
+            visible = scope is None or bool(suspects)
+            result = session.run(query, account_id=account_id) if visible else []
             transactions = [
                 {
                     "partner_id": row["partner_id"],
@@ -606,13 +731,12 @@ async def get_financial_network(
                 }
                 for row in result
             ]
-            suspects_row = session.run(suspect_query, account_id=account_id).single()
-            suspects = suspects_row["suspects"] if suspects_row else []
         log_action(
             current_user,
             action="view_financial_network",
             resource=f"account:{account_id}",
             justification=justification,
+            extra={"jurisdiction_filter": scope, "in_scope": visible},
         )
         return {
             "status": "success",
@@ -631,16 +755,21 @@ async def get_financial_network(
 async def detect_burner_phones(threshold: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """Phones with unusually high outgoing volume. `threshold` overrides the adaptive top-percentile cutoff."""
     try:
-        query = """
+        scope = search_scope(current_user)
+        # Scoped officers only see phones used by suspects with FIRs in their jurisdiction, and the adaptive cutoff is
+        # computed over that slice, not the whole country.
+        query = f"""
         MATCH (p:Phone)-[c:CALLED]->(target:Phone)
+        WHERE $scope IS NULL OR EXISTS {{ (s:Suspect)-[:USES_PHONE]->(p) WHERE {SUSPECT_IN_SCOPE} }}
         WITH p, count(c) as call_count
         RETURN p.id AS suspect_phone, call_count
         ORDER BY call_count DESC
         """
         with neo4j_driver.session() as session:
-            rows = [(row["suspect_phone"], row["call_count"]) for row in session.run(query)]
+            rows = [(row["suspect_phone"], row["call_count"]) for row in session.run(query, scope=scope)]
         cutoff = threshold if threshold is not None else burner_cutoff([n for _, n in rows])
         burners = [{"phone": phone, "calls": n} for phone, n in rows if n >= cutoff]
+        log_action(current_user, action="view_burners", resource="analytics:burners", extra={"jurisdiction_filter": scope, "flagged": len(burners)})
         return {
             "status": "success",
             "threshold": cutoff,
@@ -915,7 +1044,9 @@ async def unified_enroll(
             # attributed to a district by accident.
             "jurisdiction": current_user["jurisdiction"] if search_scope(current_user) else UNASSIGNED,
             "description": f"Target manually enrolled. History: {history}",
-            "Image": image_url 
+            "Image": image_url,
+            "accused_canonical": canonical_name(accused),
+            "accused_aliases": name_aliases(accused),
         }
         es_client.index(index="argus-firs", id=fir_id, document=record)
 

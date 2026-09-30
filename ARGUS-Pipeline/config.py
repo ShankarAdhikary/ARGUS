@@ -10,9 +10,27 @@ start if any required secret is missing when running outside of development mode
 import os
 
 
+# Secrets rendered by the Vault agent sidecar: one file per secret (file name = lower-cased variable name). A non-empty
+# file wins over the environment variable, so a deployment can move a secret into Vault without touching the code.
+SECRETS_DIR = os.getenv("SECRETS_DIR", "/vault/secrets")
+
+
+def _secret(key: str) -> str | None:
+    try:
+        with open(os.path.join(SECRETS_DIR, key.lower()), encoding="utf-8") as fh:
+            value = fh.read().strip()
+        if value:
+            return value
+    except OSError:
+        pass
+    return os.getenv(key)
+
+
 def _require(key: str, default: str | None = None) -> str:
-    """Return the env var value or raise RuntimeError if it is missing in production."""
-    value = os.getenv(key, default)
+    """Return the secret (Vault file, else env var) or raise RuntimeError if it is missing in production."""
+    value = _secret(key)
+    if value is None:
+        value = default
     if not value:
         raise RuntimeError(
             f"[ARGUS] Required environment variable {key!r} is not set. "
@@ -24,17 +42,17 @@ def _require(key: str, default: str | None = None) -> str:
 _DEV_MODE = os.getenv("ARGUS_ENV", "production").lower() in ("dev", "development", "local")
 
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "admin")
+MINIO_ACCESS_KEY = _secret("MINIO_ACCESS_KEY") or "admin"
 MINIO_SECRET_KEY = _require("MINIO_SECRET_KEY", "password" if _DEV_MODE else None)
 MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
 BUCKET_NAME = os.getenv("MINIO_BUCKET", "argus-raw-data")
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD") or None  # None = no auth (local dev)
+REDIS_PASSWORD = _secret("REDIS_PASSWORD") or None  # None = no auth (local dev)
 ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
 ELASTICSEARCH_USER = os.getenv("ELASTICSEARCH_USER", "elastic")
-ELASTICSEARCH_PASSWORD = os.getenv("ELASTICSEARCH_PASSWORD")
+ELASTICSEARCH_PASSWORD = _secret("ELASTICSEARCH_PASSWORD")
 # Only send basic auth when a password is configured, so a local unsecured
 # Elasticsearch still works for development.
 ES_AUTH_KWARGS = (
@@ -47,12 +65,12 @@ NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = _require("NEO4J_PASSWORD", "password" if _DEV_MODE else None)
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq").lower()
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_API_KEY = _secret("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
 # Gemini is reached through its OpenAI-compatible surface, so both providers
 # share one request shape and differ only in URL, key and model.
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = _secret("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
 GEMINI_BASE_URL = os.getenv(
     "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -75,7 +93,7 @@ JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "480" if _DEV_MODE else
 MFA_REQUIRED_ROLES = [r.strip() for r in os.getenv("MFA_REQUIRED_ROLES", "").split(",") if r.strip()]
 MFA_ISSUER = os.getenv("MFA_ISSUER", "ARGUS")
 # Fernet key used to encrypt TOTP secrets at rest. Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-MFA_ENCRYPTION_KEY = os.getenv("MFA_ENCRYPTION_KEY", "")
+MFA_ENCRYPTION_KEY = _secret("MFA_ENCRYPTION_KEY") or ""
 
 # Hindi/Indic NER fallback (off by default: needs the optional requirements-indic.txt and a ~400 MB model download).
 ENABLE_INDIC_NER = os.getenv("ENABLE_INDIC_NER", "false").lower() == "true"
@@ -128,5 +146,19 @@ def assert_production_safe() -> None:
         problems.append("REDIS_PASSWORD must be set")
     if not MFA_ENCRYPTION_KEY:
         problems.append("MFA_ENCRYPTION_KEY must be set (Fernet key for TOTP secrets)")
+    if os.getenv("ARGUS_DEBUG_PORTS_OPEN", "false").lower() == "true":
+        problems.append(
+            "debug ports (Neo4j browser 7474, MinIO console 9001) are published to the host; "
+            "start without docker-compose.debug.yml"
+        )
     if problems:
         raise RuntimeError("[ARGUS] Unsafe production configuration: " + "; ".join(problems))
+
+# Keyed hash for victim pseudonyms (Aadhaar tokens are never stored raw). Changing it orphans existing Victim nodes.
+VICTIM_HASH_PEPPER = _require("VICTIM_HASH_PEPPER", "argus-dev-victim-pepper" if _DEV_MODE else None)
+
+# Offline speech-to-text (open-weight Whisper, runs on CPU; no audio leaves the deployment).
+ENABLE_VOICE = os.getenv("ENABLE_VOICE", "true").lower() == "true"
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
+WHISPER_CACHE_DIR = os.getenv("WHISPER_CACHE_DIR", "/opt/whisper-cache")
+VOICE_MAX_BYTES = int(os.getenv("VOICE_MAX_BYTES", str(25 * 1024 * 1024)))

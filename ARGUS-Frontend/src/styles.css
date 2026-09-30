@@ -1110,3 +1110,39 @@ a.stat-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 
 
 .format-picker { border: 1px solid var(--border-2); border-radius: var(--radius-md); padding: 10px 14px; margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
 .format-picker legend { padding: 0 6px; font-size: .8125rem; color: var(--text-2); }
+
+/* ── WSRS ── */
+.wsrs-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 700; border: 1px solid var(--border-2); color: var(--text-2); white-space: nowrap; }
+.wsrs-high { color: var(--red); background: var(--red-bg); border-color: var(--red); }
+.wsrs-medium { color: var(--amber); background: var(--amber-bg); border-color: var(--amber); }
+.wsrs-low { color: var(--green); background: var(--green-bg); border-color: var(--green); }
+.wsrs-bars { display: flex; flex-direction: column; gap: 12px; }
+.wsrs-bar-row { display: flex; flex-direction: column; gap: 4px; }
+.wsrs-bar-head { display: flex; justify-content: space-between; font-size: .875rem; color: var(--text); }
+.wsrs-bar-score { font-variant-numeric: tabular-nums; font-weight: 600; }
+.wsrs-bar-track { height: 8px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.wsrs-bar-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .3s ease; }
+
+/* ── Geographic risk ── */
+.geo-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 18px; align-items: start; }
+.geo-map { height: 560px; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+.geo-legend { display: inline-flex; gap: 6px; }
+.geo-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+.geo-forecast-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.geo-forecast-list li { display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 900px) { .geo-layout { grid-template-columns: 1fr; } .geo-map { height: 420px; } }
+
+/* ── Voice FIR entity chips ── */
+.voice-fir { margin-bottom: 14px; }
+.voice-transcript { line-height: 1.7; margin: 10px 0; }
+.ent, .ent-chip { border-radius: 4px; padding: 1px 6px; font-size: .8125rem; border: 1px solid transparent; }
+.ent { color: var(--text); }
+.ent-chip { display: inline-flex; border-radius: 20px; padding: 3px 10px; font-weight: 600; }
+.ent-person { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); }
+.ent-phone { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.ent-location { background: var(--amber-bg); border-color: var(--amber); color: var(--amber); }
+.ent-section { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+mark.ent { background: transparent; }
+mark.ent.ent-person { background: var(--blue-bg); } mark.ent.ent-phone { background: var(--green-bg); }
+mark.ent.ent-location { background: var(--amber-bg); } mark.ent.ent-section { background: var(--red-bg); }
+button.danger { background: var(--red); border-color: var(--red); color: var(--bg); }
